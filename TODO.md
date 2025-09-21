@@ -25,4 +25,3 @@
 - offline: persist draft input; queue offline adds and sync when online
 - security: basic CSP headers; sanitize rendered metadata; no third-party calls
 - deployment: vercel project; set env; disable analytics/tracking
-- tests: playwright e2e for add, delete+undo, search, keyboard flows
