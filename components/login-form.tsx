@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -21,17 +21,26 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
 	const emailId = useId();
 	const passwordId = useId();
+	const confirmPasswordId = useId();
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [confirmPassword, setConfirmPassword] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [isSignUp, setIsSignUp] = useState(false);
 	const router = useRouter();
+	const confirmPasswordRef = useRef<HTMLInputElement>(null);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setIsLoading(true);
 		setError("");
+
+		// Validate password confirmation during sign up
+		if (isSignUp && password !== confirmPassword) {
+			setIsLoading(false);
+			return;
+		}
 
 		try {
 			if (isSignUp) {
@@ -75,7 +84,13 @@ export function LoginForm({
 					<form onSubmit={handleSubmit}>
 						<div className="flex flex-col gap-6">
 							{error && (
-								<div className="text-sm text-red-600 text-center">{error}</div>
+								<div
+									className="text-sm text-red-600 text-center"
+									role="alert"
+									aria-live="polite"
+								>
+									{error}
+								</div>
 							)}
 							<div className="grid gap-3">
 								<Label htmlFor={emailId}>Email</Label>
@@ -85,27 +100,58 @@ export function LoginForm({
 									placeholder="m@example.com"
 									value={email}
 									onChange={(e) => setEmail(e.target.value)}
+									autoComplete="email"
+									name="email"
+									spellCheck={false}
 									required
 								/>
 							</div>
 							<div className="grid gap-3">
 								<div className="flex items-center">
 									<Label htmlFor={passwordId}>Password</Label>
-									<button
-										type="button"
-										className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-									>
-										Forgot your password?
-									</button>
+									{!isSignUp && (
+										<button
+											type="button"
+											className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+										>
+											Forgot your password?
+										</button>
+									)}
 								</div>
 								<Input
 									id={passwordId}
 									type="password"
 									value={password}
 									onChange={(e) => setPassword(e.target.value)}
+									autoComplete={isSignUp ? "new-password" : "current-password"}
+									name="password"
 									required
 								/>
 							</div>
+							{isSignUp && password && (
+								<div className="grid gap-3 animate-in slide-in-from-top-2 duration-200 motion-reduce:animate-none">
+									<Label htmlFor={confirmPasswordId}>Confirm Password</Label>
+									<Input
+										ref={confirmPasswordRef}
+										id={confirmPasswordId}
+										type="password"
+										value={confirmPassword}
+										onChange={(e) => setConfirmPassword(e.target.value)}
+										autoComplete="new-password"
+										name="confirmPassword"
+										required
+									/>
+									{confirmPassword && password !== confirmPassword && (
+										<div
+											className="text-sm text-red-600"
+											role="alert"
+											aria-live="polite"
+										>
+											Passwords do not match
+										</div>
+									)}
+								</div>
+							)}
 							<Button type="submit" className="w-full" disabled={isLoading}>
 								{isLoading
 									? isSignUp
@@ -124,6 +170,7 @@ export function LoginForm({
 									onClick={() => {
 										setIsSignUp(!isSignUp);
 										setError("");
+										setConfirmPassword("");
 									}}
 									className="underline underline-offset-4"
 								>
