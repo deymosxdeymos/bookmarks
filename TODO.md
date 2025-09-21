@@ -1,7 +1,4 @@
 # TODO
-- Use biome for formatting and linting then ditch ESLint
-- setup supabase as db
-- add biome.json and package scripts (format, lint)
 - add pre-commit hook to run typecheck + biome
 - remove eslint config/deps
 - init shadcn/ui; add button, input, textarea, dialog, command, toast
