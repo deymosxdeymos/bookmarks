@@ -1,15 +1,9 @@
 # TODO
-- add pre-commit hook to run typecheck + biome
-- remove eslint config/deps
-- init shadcn/ui; add button, input, textarea, dialog, command, toast
-- base layout: server components, no client fetching
+- create homepage
 - bookmarks table in supabase: id, url, title, description, image_url, favicon_url, site_name, type, tags[], created_at, updated_at
 - supabase RLS: row-level by user_id; service role only on server
-- env: add .env.example; SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE
-- server actions: addBookmark, deleteBookmark, togglePin, bulkImport, exportAll
 - content detection: url | note | image | file (auto on paste/submit)
 - metadata fetch: /api/metadata; parse title/og/twitter/canonical; resolve favicon; 24h cache
-- image handling: add images.remotePatterns in next.config.ts; use next/image; support avif/webp
 - link card UI: minimal card, favicon, title, host, description; graceful fallbacks
 - keyboard: / focus search; a add; j/k navigate; enter open; cmd+enter new tab; d delete; u undo; cmd+k command palette
 - command palette: add, search, filter by tag, pin/unpin, delete
@@ -21,7 +15,6 @@
 - accessibility: focus-visible rings; roles/aria for dialog/command; icon buttons have aria-labels
 - error & loading states: app/error.tsx, app/loading.tsx; empty states
 - performance: RSC-first; zero-js list; streaming where possible
-- runtime: edge for /api/metadata; cache revalidate 86400
 - offline: persist draft input; queue offline adds and sync when online
 - security: basic CSP headers; sanitize rendered metadata; no third-party calls
 - deployment: vercel project; set env; disable analytics/tracking

@@ -1,64 +1,31 @@
-# AI Agent Guidelines - EduTeams
+# AI Agent Guidelines - Bookmarks
+
+## Commands
+
+- **Build:** `bun run build` (uses Next.js with turbopack)
+- **Lint:** `bun run lint` (Biome)
+- **Type Check:** `bun run check`
+- **Format:** `bun run format` or `npm run fix`
+- **Dev:** `bun dev`
 
 ## Code Style
-- **Formatting:** Biome
-- **Imports:** Use `@/` alias for src/, organize imports automatically
-- **Types:** Strict TypeScript, infer when possible, explicit for complex objects
-- **Naming:** camelCase vars/functions, PascalCase components/types, kebab-case files
-- **Components:** Server-first, `"use client"` only for interactivity
-- **API:** Zod validation, error.tsx boundaries, HttpError classes
 
-## React Rules
-- Never fetch in Client Components - use Server Components
-- Skip `useState` unless reactive, prefer variables/`useRef`
-- Derive data, avoid `useEffect` except for external systems
-- Wrap expensive components in `<Suspense>`
-- Only mark `"use client"` when necessary
+- **Formatting:** Biome with tab indentation, double quotes
+- **Imports:** Use `@/` alias, auto-organize imports
+- **Types:** Strict TypeScript, explicit for complex objects
+- **Naming:** camelCase vars/functions, PascalCase components, kebab-case files
+- **Components:** Server Components by default, `"use client"` only for
+  interactivity
 
-## UI Component Patterns
-- Use shadcn/ui as the base component library
-- Extend components with proper TypeScript interfaces
-- Use `cn()` utility for conditional class names
-- Implement proper accessibility attributes
+## Next.js Patterns
 
-## Form Components
-- Use React Hook Form with Zod validation
-- Implement proper error states
-- Use controlled components
-- Handle loading and submission states
+- Server Components for data fetching, Client Components for state/interactivity
+- Use proper loading.tsx, error.tsx boundaries
+- Implement Suspense for async components
+- Use Zod for validation, shadcn/ui for components
 
-## Data Display Components
-- Use proper loading states
-- Implement error boundaries
-- Handle empty states gracefully
-- Use proper data formatting
+## Key Libraries
 
-## Layout Components
-- Create reusable layout patterns
-- Use proper responsive design
-- Implement proper spacing and typography
-- Handle different screen sizes
-
-## State Management in Components
-- Use local state for UI state
-- Use SWR for server state
-- Implement proper loading states
-- Handle error states appropriately
-
-## Accessibility
-- Use proper semantic HTML
-- Implement proper ARIA attributes
-- Ensure keyboard navigation
-- Test with screen readers
-
-## Performance
-- Use React.memo for expensive components
-- Implement proper key props for lists
-- Use dynamic imports for large components
-- Optimize re-renders
-
-## Component Composition
-- Prefer composition over inheritance
-- Use render props when appropriate
-- Create flexible component APIs
-- Implement proper prop forwarding
+- UI: shadcn/ui with Radix, Tailwind CSS, Lucide icons
+- Forms: React Hook Form + Zod validation
+- Utils: clsx/cn for conditional classes, next-themes for dark mode
