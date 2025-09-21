@@ -25,6 +25,7 @@ export function LoginForm({
 	const [password, setPassword] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState("");
+	const [isSignUp, setIsSignUp] = useState(false);
 	const router = useRouter();
 
 	const handleSubmit = async (e: React.FormEvent) => {
@@ -33,13 +34,25 @@ export function LoginForm({
 		setError("");
 
 		try {
-			await authClient.signIn.email({
-				email,
-				password,
-			});
+			if (isSignUp) {
+				await authClient.signUp.email({
+					email,
+					password,
+					name: email.split("@")[0], // Use email prefix as name
+				});
+			} else {
+				await authClient.signIn.email({
+					email,
+					password,
+				});
+			}
 			router.push("/dashboard");
 		} catch (_err) {
-			setError("Invalid email or password");
+			setError(
+				isSignUp
+					? "Failed to create account. Please try again."
+					: "Invalid email or password",
+			);
 		} finally {
 			setIsLoading(false);
 		}
@@ -49,9 +62,13 @@ export function LoginForm({
 		<div className={cn("flex flex-col gap-6", className)} {...props}>
 			<Card>
 				<CardHeader>
-					<CardTitle>Login to your account</CardTitle>
+					<CardTitle>
+						{isSignUp ? "Create an account" : "Login to your account"}
+					</CardTitle>
 					<CardDescription>
-						Enter your email below to login to your account
+						{isSignUp
+							? "Enter your email below to create your account"
+							: "Enter your email below to login to your account"}
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -90,8 +107,29 @@ export function LoginForm({
 								/>
 							</div>
 							<Button type="submit" className="w-full" disabled={isLoading}>
-								{isLoading ? "Signing in..." : "Login"}
+								{isLoading
+									? isSignUp
+										? "Creating account..."
+										: "Signing in..."
+									: isSignUp
+										? "Create account"
+										: "Login"}
 							</Button>
+							<div className="mt-4 text-center text-sm">
+								{isSignUp
+									? "Already have an account? "
+									: "Don't have an account? "}
+								<button
+									type="button"
+									onClick={() => {
+										setIsSignUp(!isSignUp);
+										setError("");
+									}}
+									className="underline underline-offset-4"
+								>
+									{isSignUp ? "Sign in" : "Sign up"}
+								</button>
+							</div>
 						</div>
 					</form>
 				</CardContent>
