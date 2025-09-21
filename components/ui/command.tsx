@@ -1,5 +1,5 @@
-import { forwardRef } from "react";
 import { Command as CommandPrimitive } from "cmdk";
+import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
 export const Command = forwardRef<
