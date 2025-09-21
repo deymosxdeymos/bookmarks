@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useId } from "react";
 import { useRouter } from "next/navigation";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 export function LoginForm({
 	className,
@@ -38,7 +38,7 @@ export function LoginForm({
 				password,
 			});
 			router.push("/dashboard");
-		} catch (err) {
+		} catch (_err) {
 			setError("Invalid email or password");
 		} finally {
 			setIsLoading(false);
