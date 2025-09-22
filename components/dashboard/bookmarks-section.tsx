@@ -1,16 +1,19 @@
 "use client";
 
+import type { QueryKey } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import type { ListResult } from "@/lib/bookmarks-repo";
 import { fallbackIcon } from "@/lib/metadata";
 import { useDeleteBookmark } from "@/lib/queries/bookmarks";
 import type { Bookmark } from "@/lib/schemas";
 
 type BookmarksSectionProps = {
 	initialItems: Bookmark[];
+	queryKey: QueryKey;
 };
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -23,21 +26,19 @@ function formatCreatedAt(value: unknown): string {
 	return Number.isNaN(d.getTime()) ? "" : dateFormatter.format(d);
 }
 
-export function BookmarksSection({ initialItems }: BookmarksSectionProps) {
+export function BookmarksSection({
+	initialItems,
+	queryKey,
+}: BookmarksSectionProps) {
 	const rootRef = useRef<HTMLUListElement>(null);
 	const queryClient = useQueryClient();
-	const deleteBookmarkMutation = useDeleteBookmark();
+	const { mutate: mutateBookmark } = useDeleteBookmark();
 	const [undoStackVersion, setUndoStackVersion] = useState(0);
+	const latestInitialItemsRef = useRef(initialItems);
 
 	useEffect(() => {
-		const existingData = queryClient.getQueryData<Bookmark[]>(["bookmarks"]);
-		if (
-			!existingData ||
-			JSON.stringify(existingData) !== JSON.stringify(initialItems)
-		) {
-			queryClient.setQueryData<Bookmark[]>(["bookmarks"], initialItems);
-		}
-	}, [queryClient, initialItems]);
+		latestInitialItemsRef.current = initialItems;
+	}, [initialItems]);
 
 	const deleteIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const isKeyHeldRef = useRef(false);
@@ -47,15 +48,23 @@ export function BookmarksSection({ initialItems }: BookmarksSectionProps) {
 	>([]);
 	const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-	const items = useMemo(() => {
-		void undoStackVersion;
-		const currentBookmarks =
-			queryClient.getQueryData<Bookmark[]>(["bookmarks"]) ?? initialItems;
+	const getCurrentItems = useCallback(() => {
+		const result = queryClient.getQueryData<ListResult>(queryKey);
+		return result?.items ?? latestInitialItemsRef.current;
+	}, [queryClient, queryKey]);
+
+	const getVisibleItems = useCallback(() => {
+		const baseItems = getCurrentItems();
 		const pendingDeleteIds = new Set(
 			undoStackRef.current.map((item) => item.bookmark.id),
 		);
-		return currentBookmarks.filter((item) => !pendingDeleteIds.has(item.id));
-	}, [queryClient, initialItems, undoStackVersion]);
+		return baseItems.filter((item) => !pendingDeleteIds.has(item.id));
+	}, [getCurrentItems]);
+
+	const items = useMemo(() => {
+		void undoStackVersion;
+		return getVisibleItems();
+	}, [getVisibleItems, undoStackVersion]);
 
 	const queryLinks = useCallback(() => {
 		return rootRef.current?.querySelectorAll<HTMLAnchorElement>(
@@ -63,42 +72,57 @@ export function BookmarksSection({ initialItems }: BookmarksSectionProps) {
 		);
 	}, []);
 
-	const drainDeletionQueue = useCallback(() => {
-		const itemsToDelete = [...undoStackRef.current];
+	const drainDeletionQueue = useCallback(
+		(options?: { suppressStateUpdates?: boolean }) => {
+			if (undoStackRef.current.length === 0) {
+				return;
+			}
 
-		let completedMutations = 0;
-		const totalMutations = itemsToDelete.length;
+			if (undoTimeoutRef.current) {
+				clearTimeout(undoTimeoutRef.current);
+				undoTimeoutRef.current = null;
+			}
 
-		const checkCompletion = () => {
-			completedMutations++;
-			if (completedMutations === totalMutations) {
-				for (const toDelete of itemsToDelete) {
-					if (toDelete.toastId) {
-						toast.dismiss(toDelete.toastId);
+			const suppressStateUpdates = options?.suppressStateUpdates ?? false;
+			const itemsToDelete = [...undoStackRef.current];
+			let completedMutations = 0;
+			const totalMutations = itemsToDelete.length;
+
+			const checkCompletion = () => {
+				completedMutations++;
+				if (completedMutations === totalMutations) {
+					for (const toDelete of itemsToDelete) {
+						if (toDelete.toastId) {
+							toast.dismiss(toDelete.toastId);
+						}
+					}
+
+					undoStackRef.current = undoStackRef.current.filter(
+						(item) =>
+							!itemsToDelete.some(
+								(toDelete) => toDelete.bookmark.id === item.bookmark.id,
+							),
+					);
+
+					if (!suppressStateUpdates) {
+						setUndoStackVersion((v) => v + 1);
 					}
 				}
+			};
 
-				undoStackRef.current = undoStackRef.current.filter(
-					(item) =>
-						!itemsToDelete.some(
-							(toDelete) => toDelete.bookmark.id === item.bookmark.id,
-						),
-				);
-				setUndoStackVersion((v) => v + 1);
+			for (const toDelete of itemsToDelete) {
+				mutateBookmark(toDelete.bookmark.id, {
+					onSuccess: () => {
+						checkCompletion();
+					},
+					onError: () => {
+						checkCompletion();
+					},
+				});
 			}
-		};
-
-		for (const toDelete of itemsToDelete) {
-			deleteBookmarkMutation.mutate(toDelete.bookmark.id, {
-				onSuccess: () => {
-					checkCompletion();
-				},
-				onError: () => {
-					checkCompletion();
-				},
-			});
-		}
-	}, [deleteBookmarkMutation.mutate]);
+		},
+		[mutateBookmark],
+	);
 
 	const undoDelete = useCallback(() => {
 		const lastDeleted = undoStackRef.current.pop();
@@ -220,15 +244,7 @@ export function BookmarksSection({ initialItems }: BookmarksSectionProps) {
 									focusedElement.getAttribute("data-bookmark-id");
 								if (!currentBookmarkId) return;
 
-								const currentBookmarks =
-									queryClient.getQueryData<Bookmark[]>(["bookmarks"]) ??
-									initialItems;
-								const pendingDeleteIds = new Set(
-									undoStackRef.current.map((item) => item.bookmark.id),
-								);
-								const currentItems = currentBookmarks.filter(
-									(item) => !pendingDeleteIds.has(item.id),
-								);
+								const currentItems = getVisibleItems();
 
 								const currentBookmark = currentItems.find(
 									(item) => item.id === currentBookmarkId,
@@ -297,7 +313,7 @@ export function BookmarksSection({ initialItems }: BookmarksSectionProps) {
 				}
 			}
 		},
-		[queryLinks, items, deleteBookmark, undoDelete, initialItems, queryClient],
+		[queryLinks, items, deleteBookmark, undoDelete, getVisibleItems],
 	);
 
 	useEffect(() => {
@@ -344,10 +360,7 @@ export function BookmarksSection({ initialItems }: BookmarksSectionProps) {
 			if (initialDelayRef.current) {
 				clearTimeout(initialDelayRef.current);
 			}
-			if (undoTimeoutRef.current) {
-				clearTimeout(undoTimeoutRef.current);
-			}
-			drainDeletionQueue();
+			drainDeletionQueue({ suppressStateUpdates: true });
 		};
 	}, [undoDelete, drainDeletionQueue]);
 
