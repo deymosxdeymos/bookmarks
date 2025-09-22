@@ -1,5 +1,3 @@
-import { cache } from "react";
-
 export type MetadataResult = {
 	title: string;
 	description?: string;
@@ -9,6 +7,36 @@ export type MetadataResult = {
 
 const userAgent =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+
+function decodeHtmlEntities(
+	value: string | undefined | null,
+): string | undefined {
+	if (value == null) return undefined;
+	let result = value;
+	result = result.replace(/&#(x?[0-9a-fA-F]+);/g, (_m, code: string) => {
+		try {
+			const isHex = code.startsWith("x") || code.startsWith("X");
+			const num = parseInt(isHex ? code.slice(1) : code, isHex ? 16 : 10);
+			if (!Number.isFinite(num)) return _m;
+			return String.fromCodePoint(num);
+		} catch {
+			return _m;
+		}
+	});
+	const named: Record<string, string> = {
+		amp: "&",
+		lt: "<",
+		gt: ">",
+		quot: '"',
+		apos: "'",
+		nbsp: " ",
+	};
+	result = result.replace(/&([a-zA-Z]+);/g, (m, name: string) => {
+		const decoded = named[name.toLowerCase()];
+		return decoded !== undefined ? decoded : m;
+	});
+	return result;
+}
 
 function cleanDomain(rawUrl: string): string {
 	try {
@@ -51,8 +79,7 @@ function parseAttributes(tag: string): Record<string, string> {
 
 function extractMeta(html: string, targets: string[]): string | undefined {
 	const metaRegex = /<meta[^>]*>/gi;
-	let match = metaRegex.exec(html);
-	while (match) {
+	for (let match = metaRegex.exec(html); match; match = metaRegex.exec(html)) {
 		const tag = match[0];
 		if (!tag) {
 			continue;
@@ -66,7 +93,6 @@ function extractMeta(html: string, targets: string[]): string | undefined {
 		if (targets.includes(key.toLowerCase())) {
 			return content;
 		}
-		match = metaRegex.exec(html);
 	}
 	return undefined;
 }
@@ -78,8 +104,7 @@ function extractTitle(html: string): string | undefined {
 
 function extractIcon(html: string, pageUrl: string): string | undefined {
 	const linkRegex = /<link[^>]*>/gi;
-	let match = linkRegex.exec(html);
-	while (match) {
+	for (let match = linkRegex.exec(html); match; match = linkRegex.exec(html)) {
 		const tag = match[0];
 		if (!tag) {
 			continue;
@@ -104,77 +129,155 @@ function extractIcon(html: string, pageUrl: string): string | undefined {
 		if (absolute) {
 			return absolute;
 		}
-		match = linkRegex.exec(html);
 	}
 	return undefined;
 }
 
-async function fetchHtml(url: string): Promise<string | undefined> {
+async function fetchHtml(
+	url: string,
+	traceId?: string,
+): Promise<string | undefined> {
 	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), 3000);
+	const timeoutId = setTimeout(() => controller.abort(), 8000);
 	try {
+		console.log("[metadata] fetch:direct:start", { traceId, url });
 		const response = await fetch(url, {
 			headers: {
 				"user-agent": userAgent,
 				accept: "text/html,application/xhtml+xml",
+				"accept-language": "en-US,en;q=0.9",
 			},
 			signal: controller.signal,
+			redirect: "follow",
 			next: {
 				revalidate: 60 * 60 * 24,
 			},
+		});
+		const contentType = response.headers.get("content-type")?.toLowerCase();
+		console.log("[metadata] fetch:direct:response", {
+			traceId,
+			ok: response.ok,
+			status: response.status,
+			contentType,
 		});
 
 		if (!response.ok) {
 			return undefined;
 		}
 
-		const contentType = response.headers.get("content-type")?.toLowerCase();
 		if (contentType && !contentType.includes("text/html")) {
 			return undefined;
 		}
 
-		return await response.text();
-	} catch {
+		const text = await response.text();
+		console.log("[metadata] fetch:direct:ok", { traceId, length: text.length });
+		return text;
+	} catch (error) {
+		console.log("[metadata] fetch:direct:error", {
+			traceId,
+			error: String(error),
+		});
 		return undefined;
 	} finally {
 		clearTimeout(timeoutId);
 	}
 }
 
-export const getMetadata = cache(
-	async (url: string): Promise<MetadataResult> => {
-		const domain = cleanDomain(url);
-		const html = await fetchHtml(url);
+export async function getMetadata(
+	url: string,
+	traceId?: string,
+): Promise<MetadataResult> {
+	const domain = cleanDomain(url);
+	console.log("[metadata] start", { traceId, url, domain });
+	let html = await fetchHtml(url, traceId);
 
-		if (!html) {
-			return {
-				title: domain,
-				domain,
-				iconUrl: fallbackIcon(domain),
-			};
+	if (!html) {
+		try {
+			const baseEnv =
+				process.env.NEXT_PUBLIC_APP_URL ||
+				process.env.VERCEL_URL ||
+				process.env.NEXT_PUBLIC_VERCEL_URL;
+			const base = baseEnv
+				? baseEnv.startsWith("http")
+					? baseEnv
+					: `https://${baseEnv}`
+				: "http://localhost:3000";
+			const proxyUrl = `${base}/api/metadata?url=${encodeURIComponent(url)}`;
+			console.log("[metadata] fetch:proxy:start", { traceId, base, proxyUrl });
+			const res = await fetch(proxyUrl, {
+				next: { revalidate: 60 * 60 * 24 },
+				redirect: "follow",
+			});
+			const contentType = res.headers.get("content-type")?.toLowerCase();
+			console.log("[metadata] fetch:proxy:response", {
+				traceId,
+				ok: res.ok,
+				status: res.status,
+				contentType,
+			});
+			if (res.ok) {
+				html = await res.text();
+				console.log("[metadata] fetch:proxy:ok", {
+					traceId,
+					length: html.length,
+				});
+			}
+		} catch (error) {
+			console.log("[metadata] fetch:proxy:error", {
+				traceId,
+				error: String(error),
+			});
 		}
+	}
 
-		const title =
-			extractMeta(html, ["og:title", "twitter:title", "title"]) ??
-			extractTitle(html) ??
-			domain;
-
-		const description = extractMeta(html, [
-			"description",
-			"og:description",
-			"twitter:description",
-		]);
-
-		const iconUrl = extractIcon(html, url) ?? fallbackIcon(domain);
-
+	if (!html) {
+		console.log("[metadata] fallback:no-html", { traceId, url, domain });
 		return {
-			title,
-			description,
+			title: domain,
+			domain,
+			iconUrl: fallbackIcon(domain),
+		};
+	}
+
+	const metaTitle = decodeHtmlEntities(
+		extractMeta(html, ["og:title", "twitter:title", "title"]),
+	);
+	const titleTagTitle = decodeHtmlEntities(extractTitle(html));
+	const title = metaTitle ?? titleTagTitle ?? domain;
+	console.log("[metadata] extract:title", {
+		traceId,
+		from: metaTitle ? "meta" : titleTagTitle ? "title-tag" : "domain",
+		valueSample: title ? title.slice(0, 80) : null,
+	});
+
+	const description = decodeHtmlEntities(
+		extractMeta(html, ["description", "og:description", "twitter:description"]),
+	);
+
+	const iconUrl = extractIcon(html, url) ?? fallbackIcon(domain);
+	console.log("[metadata] extract:icon", {
+		traceId,
+		hasIcon: Boolean(iconUrl),
+		isFallback: iconUrl ? iconUrl.includes("google.com/s2/favicons") : true,
+	});
+
+	const result = {
+		title,
+		description,
+		iconUrl,
+		domain,
+	};
+	console.log("[metadata] done", {
+		traceId,
+		result: {
+			titleSample: title ? title.slice(0, 80) : null,
+			descriptionSample: description ? description.slice(0, 80) : null,
 			iconUrl,
 			domain,
-		};
-	},
-);
+		},
+	});
+	return result;
+}
 
 export function fallbackIcon(domain: string): string {
 	return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;

@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ModeToggle } from "@/components/mode-toggle";
 import { TextEntranceAnimation } from "@/components/text-entrance-animation";
 import { Asterisk } from "@/components/ui/asterisk";

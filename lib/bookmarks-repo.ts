@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { query } from "@/lib/db";
 import { getMetadata } from "@/lib/metadata";
 import {
@@ -154,27 +154,46 @@ export async function createBookmark(
 
 	const row = bookmarkRowSchema.parse(result.rows[0]);
 
-	void getMetadata(data.url)
-		.then(async (metadata) => {
-			try {
-				await query(
-					`
-                    UPDATE bookmarks
-                    SET title = $1, description = $2, icon_url = $3, domain = $4
-                    WHERE id = $5 AND user_id = $6
-                    `,
-					[
-						metadata.title,
-						metadata.description ?? null,
-						metadata.iconUrl ?? null,
-						metadata.domain,
-						row.id,
-						userId,
-					],
-				);
-			} catch {}
-		})
-		.catch(() => {});
+	void (async () => {
+		try {
+			const traceId = `${Date.now()}-${row.id}`;
+			console.log("[createBookmark] enrich:start", {
+				traceId,
+				url: data.url,
+				userId,
+				bookmarkId: row.id,
+			});
+			const metadata = await getMetadata(data.url, traceId);
+			console.log("[createBookmark] enrich:result", {
+				traceId,
+				titleSample: metadata.title?.slice(0, 80),
+				hasDescription: Boolean(metadata.description),
+				iconUrl: metadata.iconUrl,
+				domain: metadata.domain,
+			});
+			await query(
+				`
+					UPDATE bookmarks
+					SET title = $1, description = $2, icon_url = $3, domain = $4
+					WHERE id = $5 AND user_id = $6
+				`,
+				[
+					metadata.title,
+					metadata.description ?? null,
+					metadata.iconUrl ?? null,
+					metadata.domain,
+					row.id,
+					userId,
+				],
+			);
+			console.log("[createBookmark] enrich:update:ok", {
+				traceId,
+				bookmarkId: row.id,
+			});
+			revalidateTag(bookmarkTag(userId, data.categoryId ?? null));
+			revalidateTag(bookmarkTag(userId, null));
+		} catch {}
+	})();
 
 	return mapBookmarkRow(row);
 }

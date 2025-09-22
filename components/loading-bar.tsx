@@ -15,7 +15,6 @@ export function LoadingBar({ className }: LoadingBarProps) {
 	const prevPathname = useRef(pathname);
 
 	useEffect(() => {
-		// Show loading bar when pathname changes (navigation), but not on initial render
 		if (
 			prevPathname.current !== pathname &&
 			prevPathname.current !== undefined
@@ -23,7 +22,6 @@ export function LoadingBar({ className }: LoadingBarProps) {
 			setIsLoading(true);
 			setShowBar(true);
 
-			// Simulate navigation completion
 			const timer = setTimeout(() => {
 				setIsLoading(false);
 			}, 1500);
@@ -35,7 +33,6 @@ export function LoadingBar({ className }: LoadingBarProps) {
 
 	useEffect(() => {
 		if (!isLoading && showBar) {
-			// When loading is complete, keep bar filled at the end
 			const timer = setTimeout(() => {
 				setShowBar(false);
 			}, 300);

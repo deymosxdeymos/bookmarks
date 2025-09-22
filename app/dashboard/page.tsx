@@ -25,7 +25,7 @@ const searchParamsSchema = z.object({
 	category: z.string().uuid().optional(),
 	search: z.string().optional(),
 	sort: sortOrderSchema.optional(),
-	cursor: z.string().datetime({ offset: true }).optional(),
+	cursor: z.string().optional(),
 });
 
 function normalizeParams(params: RawSearchParams) {
@@ -130,6 +130,8 @@ export default async function DashboardPage({
 				}
 			: { items: [] };
 
+	const enrichedItems = initialBookmarks.items;
+
 	if (categoriesResult.status === "rejected") {
 		console.error("failed to load categories", categoriesResult.reason);
 	}
@@ -161,7 +163,7 @@ export default async function DashboardPage({
 						</div>
 					}
 				>
-					<BookmarksSection initialItems={initialBookmarks.items} />
+					<BookmarksSection initialItems={enrichedItems} />
 				</Suspense>
 			</div>
 		</div>

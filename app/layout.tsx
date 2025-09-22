@@ -3,8 +3,9 @@ import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { LoadingBar } from "@/components/loading-bar";
+import { QueryProvider } from "@/components/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/sonner";
 
 const arial = localFont({
 	src: [
@@ -59,16 +60,18 @@ export default function RootLayout({
 			<body
 				className={`${arial.variable} ${geistMono.variable} h-full overflow-hidden antialiased`}
 			>
-				<ThemeProvider
-					attribute="class"
-					defaultTheme="system"
-					enableSystem
-					disableTransitionOnChange
-				>
-					<LoadingBar />
-					{children}
-					<Toaster />
-				</ThemeProvider>
+				<QueryProvider>
+					<ThemeProvider
+						attribute="class"
+						defaultTheme="system"
+						enableSystem
+						disableTransitionOnChange
+					>
+						<LoadingBar />
+						{children}
+						<Toaster />
+					</ThemeProvider>
+				</QueryProvider>
 			</body>
 		</html>
 	);

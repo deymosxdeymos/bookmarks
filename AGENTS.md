@@ -23,6 +23,10 @@
 - Use proper loading.tsx, error.tsx boundaries
 - Implement Suspense for async components
 - Use Zod for validation, shadcn/ui for components
+- **Data Fetching:** Always use React Query for client-side data fetching.
+  Never use fetch in useEffect - it has race conditions, missing loading states,
+  stale data issues, and no request deduplication. React Query handles all edge
+  cases automatically.
 - Treat UIs as a thin layer over your data. Skip local state (like useState)
   unless it’s absolutely needed and clearly separate from business logic. Choose
   variables and useRef if it doesn't need to be reactive.

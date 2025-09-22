@@ -48,7 +48,6 @@ export async function createBookmarkAction(input: BookmarkCreateInput) {
 	const session = await requireSession();
 	const data = bookmarkCreateSchema.parse(input);
 	const bookmark = await createBookmark(session.user.id, data);
-	// Revalidate both the specific category and the "all" view
 	revalidateTag(bookmarkTag(session.user.id, data.categoryId ?? null));
 	revalidateTag(bookmarkTag(session.user.id, null)); // "all" view
 	return bookmarkSchema.parse(bookmark);
@@ -56,12 +55,9 @@ export async function createBookmarkAction(input: BookmarkCreateInput) {
 
 export async function deleteBookmarkAction(bookmarkId: string) {
 	const session = await requireSession();
-	// Get bookmark data before deletion to know which category cache to invalidate
 	const bookmark = await getBookmark(session.user.id, bookmarkId);
 	await deleteBookmark(session.user.id, bookmarkId);
-	// Revalidate the "all" view
 	revalidateTag(bookmarkTag(session.user.id, null));
-	// Also revalidate the specific category if the bookmark had one
 	if (bookmark?.categoryId) {
 		revalidateTag(bookmarkTag(session.user.id, bookmark.categoryId));
 	}
@@ -72,18 +68,14 @@ export async function setBookmarkCategoryAction(
 	categoryId: string | null,
 ) {
 	const session = await requireSession();
-	// Get current bookmark to know the old category
 	const oldBookmark = await getBookmark(session.user.id, bookmarkId);
 	const bookmark = await setBookmarkCategory(
 		session.user.id,
 		bookmarkId,
 		categoryId,
 	);
-	// Revalidate the "all" view
 	revalidateTag(bookmarkTag(session.user.id, null));
-	// Revalidate the new category
 	revalidateTag(bookmarkTag(session.user.id, categoryId));
-	// Revalidate the old category if it was different
 	if (oldBookmark?.categoryId && oldBookmark.categoryId !== categoryId) {
 		revalidateTag(bookmarkTag(session.user.id, oldBookmark.categoryId));
 	}
