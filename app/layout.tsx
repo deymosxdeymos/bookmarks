@@ -49,6 +49,12 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en" suppressHydrationWarning className="h-full overflow-hidden">
+			<head>
+				<meta
+					name="viewport"
+					content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+				/>
+			</head>
 			<body
 				className={`${arial.variable} ${geistMono.variable} h-full overflow-hidden antialiased`}
 			>

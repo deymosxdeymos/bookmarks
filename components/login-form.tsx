@@ -134,7 +134,7 @@ export function LoginForm({
 			<main className="flex flex-1 items-center justify-center px-4 pb-8">
 				<div className="w-full max-w-md space-y-8">
 					<div className="flex justify-center items-center gap-x-2">
-						<h1 className="font-medium">Welcome</h1>
+						<h1 className="font-semibold text-lg">Welcome</h1>
 						<Asterisk />
 					</div>
 					<form onSubmit={handleSubmit} className="space-y-6" noValidate>
@@ -154,7 +154,7 @@ export function LoginForm({
 								ref={emailRef}
 								id={emailId}
 								type="email"
-								placeholder="Enter your email"
+								placeholder="Enter your email…"
 								value={email}
 								onChange={(event) => {
 									setEmail(event.target.value);
@@ -185,7 +185,7 @@ export function LoginForm({
 									ref={passwordRef}
 									id={passwordId}
 									type={showPassword ? "text" : "password"}
-									placeholder="Enter your password"
+									placeholder="Enter your password…"
 									value={password}
 									onChange={(event) => {
 										setPassword(event.target.value);
