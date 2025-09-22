@@ -1,12 +1,23 @@
+import { headers } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/login-form";
 import { ModeToggle } from "@/components/mode-toggle";
 import { TextEntranceAnimation } from "@/components/text-entrance-animation";
 import { Asterisk } from "@/components/ui/asterisk";
 import { Button } from "@/components/ui/button";
+import { auth } from "@/lib/auth";
 
-export default function Page() {
+export default async function Page() {
+	const session = await auth.api.getSession({
+		headers: await headers(),
+	});
+
+	if (session) {
+		redirect("/dashboard");
+	}
+
 	return (
 		<>
 			<TextEntranceAnimation delay={100}>

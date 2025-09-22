@@ -18,6 +18,7 @@ export function LoginForm({
 	const passwordId = useId();
 	const emailErrorId = `${emailId}-error`;
 	const passwordErrorId = `${passwordId}-error`;
+	const authErrorId = useId();
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
@@ -29,9 +30,17 @@ export function LoginForm({
 	}>({});
 	const emailRef = useRef<HTMLInputElement>(null);
 	const passwordRef = useRef<HTMLInputElement>(null);
-	const errorRef = useRef<HTMLDivElement>(null);
+	const errorRef = useRef<HTMLParagraphElement>(null);
 	const router = useRouter();
 	const isDirty = email.length > 0 || password.length > 0;
+	const passwordDescribedBy = [
+		fieldErrors.password ? passwordErrorId : undefined,
+		error ? authErrorId : undefined,
+	]
+		.filter(Boolean)
+		.join(" ");
+	const passwordDescribedByAttr =
+		passwordDescribedBy.length > 0 ? passwordDescribedBy : undefined;
 
 	useEffect(() => {
 		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -93,13 +102,56 @@ export function LoginForm({
 		setIsLoading(true);
 
 		try {
-			await authClient.signIn.email({
+			const { error: signInError } = await authClient.signIn.email({
 				email: trimmedEmail,
 				password: sanitizedPassword,
 			});
+
+			if (signInError) {
+				let serverMessage: string | undefined;
+				const directMessage =
+					typeof signInError.message === "string"
+						? signInError.message.trim()
+						: "";
+				if (directMessage.length > 0) {
+					serverMessage = directMessage;
+				} else {
+					const nestedError = (signInError as { error?: unknown }).error;
+					if (typeof nestedError === "string") {
+						const nestedText = nestedError.trim();
+						if (nestedText.length > 0) {
+							serverMessage = nestedText;
+						}
+					} else if (typeof nestedError === "object" && nestedError !== null) {
+						const nestedRecord = nestedError as Record<string, unknown>;
+						const nestedMessage = nestedRecord.message;
+						if (typeof nestedMessage === "string") {
+							const trimmed = nestedMessage.trim();
+							if (trimmed.length > 0) {
+								serverMessage = trimmed;
+							}
+						}
+					}
+				}
+				const fallbackMessage =
+					signInError.status === 401
+						? "Invalid email or password."
+						: "Unable to log in right now. Try again in a moment.";
+
+				setError(serverMessage ?? fallbackMessage);
+				requestAnimationFrame(() => {
+					errorRef.current?.focus();
+				});
+				return;
+			}
+
 			router.push("/dashboard");
-		} catch (_err) {
-			setError("Invalid email or password");
+		} catch (unknownError) {
+			const message =
+				unknownError instanceof Error && unknownError.message
+					? unknownError.message
+					: "Unable to log in right now. Try again in a moment.";
+			setError(message);
 			requestAnimationFrame(() => {
 				errorRef.current?.focus();
 			});
@@ -127,17 +179,6 @@ export function LoginForm({
 						<Asterisk />
 					</div>
 					<form onSubmit={handleSubmit} className="space-y-6" noValidate>
-						{error && (
-							<div
-								ref={errorRef}
-								className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-center text-sm font-medium text-destructive"
-								role="alert"
-								aria-live="polite"
-								tabIndex={-1}
-							>
-								{error}
-							</div>
-						)}
 						<div className="space-y-2">
 							<Input
 								ref={emailRef}
@@ -149,6 +190,9 @@ export function LoginForm({
 									setEmail(event.target.value);
 									if (fieldErrors.email) {
 										setFieldErrors((prev) => ({ ...prev, email: undefined }));
+									}
+									if (error) {
+										setError("");
 									}
 								}}
 								autoComplete="email"
@@ -184,13 +228,14 @@ export function LoginForm({
 												password: undefined,
 											}));
 										}
+										if (error) {
+											setError("");
+										}
 									}}
 									autoComplete="current-password"
 									name="password"
 									aria-invalid={Boolean(fieldErrors.password)}
-									aria-describedby={
-										fieldErrors.password ? passwordErrorId : undefined
-									}
+									aria-describedby={passwordDescribedByAttr}
 									className="w-full bg-muted pr-10 text-base"
 								/>
 								<button
@@ -214,6 +259,18 @@ export function LoginForm({
 									aria-live="polite"
 								>
 									{fieldErrors.password}
+								</p>
+							)}
+							{error && (
+								<p
+									ref={errorRef}
+									id={authErrorId}
+									className="text-sm font-medium text-destructive"
+									role="alert"
+									aria-live="polite"
+									tabIndex={-1}
+								>
+									{error}
 								</p>
 							)}
 						</div>

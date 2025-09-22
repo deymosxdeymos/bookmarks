@@ -54,7 +54,7 @@ export default function Dashboard() {
 								{session.user.name || session.user.email}
 							</p>
 						</div>
-						<Button onClick={handleLogout} variant="outline" className="w-full">
+						<Button onClick={handleLogout} variant="default" className="w-full">
 							Log Out
 						</Button>
 					</CardContent>
