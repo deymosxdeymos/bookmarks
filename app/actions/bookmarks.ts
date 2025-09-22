@@ -1,38 +1,96 @@
 "use server";
-import { z } from "zod";
 
-const bookmarkSchema = z.object({
-	id: z.string().uuid().optional(),
-	url: z.string().url(),
-	title: z.string().min(1),
-	description: z.string().optional().nullable(),
-	image_url: z.string().url().optional().nullable(),
-	favicon_url: z.string().url().optional().nullable(),
-	site_name: z.string().optional().nullable(),
-	type: z.string().optional().nullable(),
-	tags: z.array(z.string()).default([]),
-});
+import { revalidateTag } from "next/cache";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import {
+	createBookmark,
+	deleteBookmark,
+	getBookmark,
+	listBookmarks,
+	listCategories,
+	setBookmarkCategory,
+} from "@/lib/bookmarks-repo";
+import {
+	type BookmarkCreateInput,
+	type BookmarkFilterInput,
+	bookmarkCreateSchema,
+	bookmarkFilterInputSchema,
+	bookmarkFilterSchema,
+	bookmarkSchema,
+} from "@/lib/schemas";
 
-export type BookmarkInput = z.infer<typeof bookmarkSchema>;
-
-export async function addBookmark(input: BookmarkInput) {
-	const data = bookmarkSchema.parse(input);
-	return data;
+function bookmarkTag(userId: string, categoryId?: string | null) {
+	return `bookmarks:${userId}:${categoryId ?? "all"}`;
 }
 
-export async function deleteBookmark(id: string) {
-	return { id };
+async function requireSession() {
+	const session = await auth.api.getSession({
+		headers: await headers(),
+	});
+	if (!session) {
+		redirect("/login");
+	}
+	return session;
 }
 
-export async function togglePin(id: string) {
-	return { id };
+export async function listBookmarksAction(input: BookmarkFilterInput) {
+	const session = await requireSession();
+	const filter = bookmarkFilterSchema.parse({
+		...bookmarkFilterInputSchema.parse(input),
+		userId: session.user.id,
+	});
+	return listBookmarks(filter);
 }
 
-export async function bulkImport(items: BookmarkInput[]) {
-	const parsed = z.array(bookmarkSchema).parse(items);
-	return parsed;
+export async function createBookmarkAction(input: BookmarkCreateInput) {
+	const session = await requireSession();
+	const data = bookmarkCreateSchema.parse(input);
+	const bookmark = await createBookmark(session.user.id, data);
+	// Revalidate both the specific category and the "all" view
+	revalidateTag(bookmarkTag(session.user.id, data.categoryId ?? null));
+	revalidateTag(bookmarkTag(session.user.id, null)); // "all" view
+	return bookmarkSchema.parse(bookmark);
 }
 
-export async function exportAll() {
-	return [] as BookmarkInput[];
+export async function deleteBookmarkAction(bookmarkId: string) {
+	const session = await requireSession();
+	// Get bookmark data before deletion to know which category cache to invalidate
+	const bookmark = await getBookmark(session.user.id, bookmarkId);
+	await deleteBookmark(session.user.id, bookmarkId);
+	// Revalidate the "all" view
+	revalidateTag(bookmarkTag(session.user.id, null));
+	// Also revalidate the specific category if the bookmark had one
+	if (bookmark?.categoryId) {
+		revalidateTag(bookmarkTag(session.user.id, bookmark.categoryId));
+	}
+}
+
+export async function setBookmarkCategoryAction(
+	bookmarkId: string,
+	categoryId: string | null,
+) {
+	const session = await requireSession();
+	// Get current bookmark to know the old category
+	const oldBookmark = await getBookmark(session.user.id, bookmarkId);
+	const bookmark = await setBookmarkCategory(
+		session.user.id,
+		bookmarkId,
+		categoryId,
+	);
+	// Revalidate the "all" view
+	revalidateTag(bookmarkTag(session.user.id, null));
+	// Revalidate the new category
+	revalidateTag(bookmarkTag(session.user.id, categoryId));
+	// Revalidate the old category if it was different
+	if (oldBookmark?.categoryId && oldBookmark.categoryId !== categoryId) {
+		revalidateTag(bookmarkTag(session.user.id, oldBookmark.categoryId));
+	}
+	return bookmark ? bookmarkSchema.parse(bookmark) : null;
+}
+
+export async function listCategoriesAction() {
+	const session = await requireSession();
+	return listCategories(session.user.id);
 }
