@@ -5,7 +5,7 @@
 - **Build:** `bun run build` (uses Next.js with turbopack)
 - **Lint:** `bun run lint` (Biome)
 - **Type Check:** `bun run check`
-- **Format:** `bun run format` or `npm run fix`
+- **Format:** `bun run format` or `bun run fix`
 - **Dev:** `bun dev`
 
 ## Code Style

@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { LoginForm } from "@/components/login-form";
 import { ModeToggle } from "@/components/mode-toggle";
+import { SignUpForm } from "@/components/sign-up-form";
 import { TextEntranceAnimation } from "@/components/text-entrance-animation";
 import { Asterisk } from "@/components/ui/asterisk";
 import { Button } from "@/components/ui/button";
@@ -16,13 +16,13 @@ export default function Page() {
 							<Asterisk />
 						</Link>
 						<div className="flex items-center gap-2">
-							<Link href="/sign-up">
+							<Link href="/login">
 								<Button
 									size="sm"
 									variant="default"
 									className="text-xs font-bold"
 								>
-									Sign up
+									Log in
 								</Button>
 							</Link>
 							<ModeToggle />
@@ -32,7 +32,7 @@ export default function Page() {
 			</TextEntranceAnimation>
 			<div className="flex h-screen w-full items-center justify-center p-6 md:p-10 pt-20">
 				<div className="w-full h-screen">
-					<LoginForm />
+					<SignUpForm />
 				</div>
 			</div>
 		</>
