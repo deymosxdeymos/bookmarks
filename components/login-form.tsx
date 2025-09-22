@@ -120,17 +120,6 @@ export function LoginForm({
 			}}
 			{...props}
 		>
-			<header className="flex items-center justify-between px-4 py-4">
-				<Asterisk />
-				<Button
-					size="sm"
-					variant="default"
-					className="text-xs font-bold"
-					asChild
-				>
-					<Link href="/sign-up">Sign up</Link>
-				</Button>
-			</header>
 			<main className="flex flex-1 items-center justify-center px-4 pb-8">
 				<div className="w-full max-w-md space-y-8">
 					<div className="flex justify-center items-center gap-x-2">
@@ -167,7 +156,7 @@ export function LoginForm({
 								spellCheck={false}
 								aria-invalid={Boolean(fieldErrors.email)}
 								aria-describedby={fieldErrors.email ? emailErrorId : undefined}
-								className="w-full rounded-md border-0 bg-muted text-base"
+								className="w-full bg-muted text-base"
 							/>
 							{fieldErrors.email && (
 								<p
@@ -202,7 +191,7 @@ export function LoginForm({
 									aria-describedby={
 										fieldErrors.password ? passwordErrorId : undefined
 									}
-									className="w-full rounded-md border-0 bg-muted pr-10 text-base"
+									className="w-full bg-muted pr-10 text-base"
 								/>
 								<button
 									type="button"
@@ -235,7 +224,12 @@ export function LoginForm({
 							>
 								Forgot password?
 							</Link>
-							<Button type="submit" disabled={isLoading} className="px-6">
+							<Button
+								size="sm"
+								type="submit"
+								disabled={isLoading}
+								className="px-4 py-3 text-sm font-bold"
+							>
 								{isLoading && (
 									<Loader2
 										className="mr-2 h-4 w-4 animate-spin"

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
+import { LoadingBar } from "@/components/loading-bar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -64,6 +65,7 @@ export default function RootLayout({
 					enableSystem
 					disableTransitionOnChange
 				>
+					<LoadingBar />
 					{children}
 					<Toaster />
 				</ThemeProvider>
