@@ -1,12 +1,35 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 
-const geistSans = Geist({
-	variable: "--font-geist-sans",
-	subsets: ["latin"],
+const arial = localFont({
+	src: [
+		{
+			path: "../public/fonts/arial/arial.ttf",
+			weight: "400",
+			style: "normal",
+		},
+		{
+			path: "../public/fonts/arial/arial-bold.ttf",
+			weight: "700",
+			style: "normal",
+		},
+		{
+			path: "../public/fonts/arial/arial-italic.ttf",
+			weight: "400",
+			style: "italic",
+		},
+		{
+			path: "../public/fonts/arial/arial-bold-italic.ttf",
+			weight: "700",
+			style: "italic",
+		},
+	],
+	variable: "--font-arial",
+	display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -25,9 +48,9 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en" suppressHydrationWarning>
+		<html lang="en" suppressHydrationWarning className="h-full overflow-hidden">
 			<body
-				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+				className={`${arial.variable} ${geistMono.variable} h-full overflow-hidden antialiased`}
 			>
 				<ThemeProvider
 					attribute="class"
