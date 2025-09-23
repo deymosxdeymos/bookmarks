@@ -1,15 +1,12 @@
+import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
 	const url = request.nextUrl;
 	const pathname = url.pathname;
 
-	// Check for session token cookie (better-auth uses this name)
-	const sessionCookie = request.cookies.get("better-auth.session_token");
-	// Only consider authenticated if cookie exists AND has a value
-	const isAuthenticated = Boolean(
-		sessionCookie?.value && sessionCookie.value.length > 0,
-	);
+	const sessionCookie = getSessionCookie(request);
+	const isAuthenticated = Boolean(sessionCookie);
 
 	const isPublicAuthRoute =
 		pathname === "/" ||
