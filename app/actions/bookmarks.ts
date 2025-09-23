@@ -9,7 +9,6 @@ import {
 	deleteBookmark,
 	getBookmark,
 	listBookmarks,
-	listCategories,
 	setBookmarkCategory,
 } from "@/lib/bookmarks-repo";
 import {
@@ -80,9 +79,4 @@ export async function setBookmarkCategoryAction(
 		revalidateTag(bookmarkTag(session.user.id, oldBookmark.categoryId));
 	}
 	return bookmark ? bookmarkSchema.parse(bookmark) : null;
-}
-
-export async function listCategoriesAction() {
-	const session = await requireSession();
-	return listCategories(session.user.id);
 }

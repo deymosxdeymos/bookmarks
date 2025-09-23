@@ -1,5 +1,34 @@
 # AI Agent Guidelines - Bookmarks
 
+## Multi-step approach to Context Engineering
+
+0. Tasks
+
+- Operating on a task basis. Store all intermediate context in markdown files in
+  tasks/<task-id>/ folders.
+- Use semantic task id slugs
+
+1. Research
+
+- Find existing patterns in this codebase
+- Search internet if relevant
+- Start by asking follow up questions to set the direction of research
+- Report findings in research.md file
+
+2. Planning
+
+- Read the research.md in tasks for <task-id>.
+- Based on the research come up with a plan for implementing the user request.
+  We should reuse existing patterns, components and code where possible.
+- If needed, ask clarifying questions to user to understand the scope of the
+  task
+- Write the comprehensive plan to plan.md. The plan should include all context
+  required for an engineer to implement the feature.
+
+3. Implementation a. Read plan.md and create a todo-list with all items, then
+   execute on the plan. b. Go for as long as possible. If ambiguous, leave all
+   questions to the end and group them.
+
 ## Commands
 
 - **Build:** `bun run build` (uses Next.js with turbopack)
@@ -23,10 +52,10 @@
 - Use proper loading.tsx, error.tsx boundaries
 - Implement Suspense for async components
 - Use Zod for validation, shadcn/ui for components
-- **Data Fetching:** Always use React Query for client-side data fetching.
-  Never use fetch in useEffect - it has race conditions, missing loading states,
-  stale data issues, and no request deduplication. React Query handles all edge
-  cases automatically.
+- **Data Fetching:** Always use React Query for client-side data fetching. Never
+  use fetch in useEffect - it has race conditions, missing loading states, stale
+  data issues, and no request deduplication. React Query handles all edge cases
+  automatically.
 - Treat UIs as a thin layer over your data. Skip local state (like useState)
   unless it’s absolutely needed and clearly separate from business logic. Choose
   variables and useRef if it doesn't need to be reactive.

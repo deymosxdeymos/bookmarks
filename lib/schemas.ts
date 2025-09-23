@@ -66,6 +66,7 @@ export const categorySchema = z.object({
 	userId: z.string().min(1),
 	name: z.string().min(1),
 	color: z.string().optional().nullable(),
+	bookmarkCount: z.number().nonnegative(),
 	createdAt: z.coerce.date(),
 });
 
@@ -76,6 +77,7 @@ export const categoryRowSchema = z.object({
 	user_id: z.string(),
 	name: z.string(),
 	color: z.string().nullable(),
+	bookmark_count: z.coerce.number().nonnegative(),
 	created_at: z.coerce.date(),
 });
 
@@ -113,6 +115,7 @@ export function mapCategoryRow(
 		userId: row.user_id,
 		name: row.name,
 		color: row.color ?? undefined,
+		bookmarkCount: row.bookmark_count,
 		createdAt: row.created_at,
 	};
 }
