@@ -26,9 +26,10 @@ export const auth = betterAuth({
 	baseURL,
 	secret: process.env.BETTER_AUTH_SECRET,
 	session: {
-		// Temporarily disable cookie cache to fix redirect loop
+		// Re-enable cookie cache for middleware performance
 		cookieCache: {
-			enabled: false,
+			enabled: true,
+			maxAge: 5 * 60, // 5 minutes
 		},
 	},
 	cookies: {

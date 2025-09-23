@@ -1,20 +1,20 @@
+import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
 	const url = request.nextUrl;
 	const pathname = url.pathname;
 
 	try {
-		// Use same session validation as pages for consistency
-		const session = await auth.api.getSession({
-			headers: request.headers,
+		// Use cookie-based session validation with custom cookie name
+		const sessionCookie = getSessionCookie(request, {
+			cookieName: "better-auth.session_token",
 		});
-		const isAuthenticated = Boolean(session);
+		const isAuthenticated = Boolean(sessionCookie);
 
 		// Add logging for debugging
 		console.log(
-			`[Middleware] ${pathname} - Auth: ${isAuthenticated}, Prod: ${process.env.NODE_ENV === "production"}`,
+			`[Middleware] ${pathname} - Auth: ${isAuthenticated}, Cookie: ${sessionCookie ? "exists" : "missing"}`,
 		);
 
 		const isPublicAuthRoute =
