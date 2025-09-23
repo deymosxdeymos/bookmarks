@@ -1,0 +1,8 @@
+[20:19:53 2025-09-23] FETCHING Version 2.42.0
+[20:19:53 2025-09-23] CREATING /home/deymos/.spicetify
+[20:19:53 2025-09-23] DOWNLOADING https://github.com/spicetify/cli/releases/download/v2.42.0/spicetify-2.42.0-linux-amd64.tar.gz
+[20:19:54 2025-09-23] EXTRACTING /home/deymos/.spicetify/spicetify.tar.gz
+[20:19:54 2025-09-23] SETTING EXECUTABLE PERMISSIONS TO /home/deymos/.spicetify/spicetify
+[20:19:54 2025-09-23] REMOVING /home/deymos/.spicetify/spicetify.tar.gz
+[20:19:54 2025-09-23] spicetify v2.42.0 was installed successfully to /home/deymos/.spicetify
+[20:19:54 2025-09-23] Run 'spicetify --help' to get started

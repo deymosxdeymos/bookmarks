@@ -4,8 +4,12 @@ export function middleware(request: NextRequest) {
 	const url = request.nextUrl;
 	const pathname = url.pathname;
 
+	// Check for session token cookie (better-auth uses this name)
 	const sessionCookie = request.cookies.get("better-auth.session_token");
-	const isAuthenticated = Boolean(sessionCookie?.value);
+	// Only consider authenticated if cookie exists AND has a value
+	const isAuthenticated = Boolean(
+		sessionCookie?.value && sessionCookie.value.length > 0,
+	);
 
 	const isPublicAuthRoute =
 		pathname === "/" ||
