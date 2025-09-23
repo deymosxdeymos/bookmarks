@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 
 const HOTKEY_SEQUENCE = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 const HOLD_DURATION_MS = 500;
+const RESET_ANIMATION_DURATION_MS = 200;
 
 type CategoryComboboxProps = {
 	userId: string;
@@ -104,9 +105,15 @@ export function CategoryCombobox({
 			holdTimeoutRef.current = null;
 		}
 		if (holdProgressRef.current) {
-			holdProgressRef.current.style.transition =
-				"width 100ms var(--ease-out-quart)";
-			holdProgressRef.current.style.width = "0%";
+			if (reducedMotionRef.current) {
+				// Instant reset for reduced motion
+				holdProgressRef.current.style.transition = "none";
+				holdProgressRef.current.style.width = "0%";
+			} else {
+				// Smooth reset with proper easing
+				holdProgressRef.current.style.transition = `width ${RESET_ANIMATION_DURATION_MS}ms var(--ease-out-quart)`;
+				holdProgressRef.current.style.width = "0%";
+			}
 		}
 	}, []);
 
@@ -139,19 +146,26 @@ export function CategoryCombobox({
 			// Start main animation after immediate feedback
 			requestAnimationFrame(() => {
 				if (progressEl) {
-					progressEl.style.transition = reducedMotionRef.current
-						? "none"
-						: `width ${HOLD_DURATION_MS}ms var(--ease-out-quart)`;
-					progressEl.style.width = "100%";
+					if (reducedMotionRef.current) {
+						// Instant completion for reduced motion
+						progressEl.style.transition = "none";
+						progressEl.style.width = "100%";
+					} else {
+						// Smooth animation over entire hold duration with linear easing for consistent progress
+						progressEl.style.transition = `width ${HOLD_DURATION_MS}ms linear`;
+						progressEl.style.width = "100%";
+					}
 				}
 			});
 		}
 
+		// Use shorter duration for reduced motion since visual feedback is instant
+		const holdDuration = reducedMotionRef.current ? 300 : HOLD_DURATION_MS;
 		holdTimeoutRef.current = setTimeout(async () => {
 			holdTimeoutRef.current = null;
 			setIsHoldActive(false);
 			await handleDelete();
-		}, HOLD_DURATION_MS);
+		}, holdDuration);
 	}, [
 		current?.id,
 		deleteCategoryMutation.isPending,
@@ -186,13 +200,16 @@ export function CategoryCombobox({
 	}, [open, resetHoldState]);
 
 	useEffect(() => {
-		const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-		const update = () => {
+		const updateReducedMotion = () => {
+			const media = window.matchMedia("(prefers-reduced-motion: reduce)");
 			reducedMotionRef.current = media.matches;
 		};
-		update();
-		media.addEventListener("change", update);
-		return () => media.removeEventListener("change", update);
+
+		updateReducedMotion();
+		const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+		media.addEventListener("change", updateReducedMotion);
+
+		return () => media.removeEventListener("change", updateReducedMotion);
 	}, []);
 
 	// Create stable keyboard handler that uses refs to access latest values
