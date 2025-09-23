@@ -23,7 +23,7 @@ import type { Category } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
 const HOTKEY_SEQUENCE = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-const HOLD_DURATION_MS = 800;
+const HOLD_DURATION_MS = 500;
 
 type CategoryComboboxProps = {
 	userId: string;
@@ -39,9 +39,9 @@ export function CategoryCombobox({
 	const [open, setOpen] = useState(false);
 	const [isCreating, setIsCreating] = useState(false);
 	const [createValue, setCreateValue] = useState("");
+	const [isHoldActive, setIsHoldActive] = useState(false);
 	const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const holdProgressRef = useRef<HTMLDivElement>(null);
-	const holdActiveRef = useRef(false);
 	const reducedMotionRef = useRef(false);
 	const router = useRouter();
 	const searchParams = useSearchParams();
@@ -98,14 +98,14 @@ export function CategoryCombobox({
 	const applySelectionRef = useRef(applySelection);
 
 	const resetHoldState = useCallback(() => {
-		holdActiveRef.current = false;
+		setIsHoldActive(false);
 		if (holdTimeoutRef.current) {
 			clearTimeout(holdTimeoutRef.current);
 			holdTimeoutRef.current = null;
 		}
 		if (holdProgressRef.current) {
 			holdProgressRef.current.style.transition =
-				"width 120ms var(--ease-out-quart)";
+				"width 100ms var(--ease-out-quart)";
 			holdProgressRef.current.style.width = "0%";
 		}
 	}, []);
@@ -125,34 +125,45 @@ export function CategoryCombobox({
 	}, [applySelection, current?.id, deleteCategoryMutation, resetHoldState]);
 
 	const startHold = useCallback(() => {
-		if (!current?.id || deleteCategoryMutation.isPending) return;
+		if (!current?.id || deleteCategoryMutation.isPending || isHoldActive)
+			return;
 		resetHoldState();
-		holdActiveRef.current = true;
+		setIsHoldActive(true);
+
+		// Immediate visual feedback
 		const progressEl = holdProgressRef.current;
 		if (progressEl) {
-			progressEl.style.transition = reducedMotionRef.current
-				? "none"
-				: `width ${HOLD_DURATION_MS}ms var(--ease-out-quart)`;
+			progressEl.style.transition = "none";
+			progressEl.style.width = "2%"; // Small initial progress
+
+			// Start main animation after immediate feedback
 			requestAnimationFrame(() => {
-				progressEl.style.width = "100%";
+				if (progressEl) {
+					progressEl.style.transition = reducedMotionRef.current
+						? "none"
+						: `width ${HOLD_DURATION_MS}ms var(--ease-out-quart)`;
+					progressEl.style.width = "100%";
+				}
 			});
 		}
+
 		holdTimeoutRef.current = setTimeout(async () => {
 			holdTimeoutRef.current = null;
-			holdActiveRef.current = false;
+			setIsHoldActive(false);
 			await handleDelete();
 		}, HOLD_DURATION_MS);
 	}, [
 		current?.id,
 		deleteCategoryMutation.isPending,
 		handleDelete,
+		isHoldActive,
 		resetHoldState,
 	]);
 
 	const cancelHold = useCallback(() => {
-		if (!holdActiveRef.current) return;
+		if (!isHoldActive) return;
 		resetHoldState();
-	}, [resetHoldState]);
+	}, [isHoldActive, resetHoldState]);
 
 	// Store latest values in refs to avoid recreating keyboard handler
 	useEffect(() => {
@@ -244,19 +255,23 @@ export function CategoryCombobox({
 	const handleCreateInputKeyDown: React.KeyboardEventHandler<
 		HTMLInputElement
 	> = (event) => {
-		if (event.key !== "Enter") {
-			return;
+		if (event.key === "Enter") {
+			event.preventDefault();
+			event.stopPropagation();
+			if (createCategoryMutation.isPending) {
+				return;
+			}
+			const form = createFormRef.current;
+			if (!form) {
+				return;
+			}
+			form.requestSubmit();
+		} else if (event.key === "Escape") {
+			event.preventDefault();
+			event.stopPropagation();
+			setIsCreating(false);
+			setCreateValue("");
 		}
-		event.preventDefault();
-		event.stopPropagation();
-		if (createCategoryMutation.isPending) {
-			return;
-		}
-		const form = createFormRef.current;
-		if (!form) {
-			return;
-		}
-		form.requestSubmit();
 	};
 
 	return (
@@ -336,29 +351,14 @@ export function CategoryCombobox({
 									className="h-8 flex-1 border-none bg-transparent px-0 text-sm focus-visible:ring-0"
 									autoComplete="off"
 									spellCheck={false}
+									disabled={createCategoryMutation.isPending}
 								/>
-								<div className="flex items-center gap-2 text-xs font-medium">
-									<button
-										type="button"
-										onClick={() => {
-											setIsCreating(false);
-											setCreateValue("");
-										}}
-										className="text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-									>
-										Cancel
-									</button>
-									<button
-										type="submit"
-										disabled={createCategoryMutation.isPending}
-										className="flex items-center gap-1 text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-70"
-									>
-										{createCategoryMutation.isPending ? (
-											<Loader2 className="size-3 animate-spin" aria-hidden />
-										) : null}
-										Add
-									</button>
-								</div>
+								{createCategoryMutation.isPending && (
+									<Loader2
+										className="size-4 animate-spin text-muted-foreground"
+										aria-hidden
+									/>
+								)}
 							</form>
 						) : (
 							<CommandItem
@@ -376,42 +376,67 @@ export function CategoryCombobox({
 						{current.id ? (
 							<CommandItem
 								value="__delete"
-								onSelect={() => {}}
+								onSelect={(value) => {
+									// Prevent selection when this is the delete item
+									if (value === "__delete") {
+										return; // Don't execute selection
+									}
+								}}
 								onPointerDown={(event) => {
 									if (event.button !== 0) return;
 									event.preventDefault();
+									event.stopPropagation();
 									startHold();
 								}}
 								onPointerUp={(event) => {
 									event.preventDefault();
+									event.stopPropagation();
 									cancelHold();
 								}}
 								onPointerLeave={() => cancelHold()}
 								onPointerCancel={() => cancelHold()}
+								onMouseDown={(event) => {
+									if (event.button !== 0) return; // Only left button
+									event.preventDefault();
+									event.stopPropagation();
+									startHold();
+								}}
+								onMouseUp={(event) => {
+									event.preventDefault();
+									event.stopPropagation();
+									cancelHold();
+								}}
+								onMouseLeave={() => cancelHold()}
 								onKeyDown={(event) => {
 									if (event.key === " " || event.key === "Enter") {
 										event.preventDefault();
-										if (!holdActiveRef.current) startHold();
+										event.stopPropagation();
+										if (!isHoldActive) startHold();
 									}
 								}}
 								onKeyUp={(event) => {
 									if (event.key === " " || event.key === "Enter") {
 										event.preventDefault();
+										event.stopPropagation();
 										cancelHold();
 									}
 								}}
-								className="group relative mt-1 flex items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus:bg-destructive/10"
+								className="group relative mt-1 flex items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-medium text-destructive transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] active:bg-destructive/15 touch-manipulation"
 							>
 								<div
 									ref={holdProgressRef}
-									className="pointer-events-none absolute inset-0 w-0 rounded-lg bg-destructive/20"
+									className={cn(
+										"pointer-events-none absolute inset-0 w-0 rounded-lg bg-destructive/30 transition-shadow duration-100",
+										isHoldActive &&
+											"shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.4)]",
+									)}
 								/>
-								<Trash2 className="size-4" aria-hidden />
+								<Trash2 className="size-4 text-destructive" aria-hidden />
 								<span className="relative z-10 text-sm font-medium">
-									<span className="block transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0 group-active:opacity-0">
+									<span className="text-destructive block transition-opacity duration-100 group-hover:opacity-0 group-focus-visible:opacity-0 group-active:opacity-0">
 										Delete Group
 									</span>
-									<span className="absolute inset-0 block text-destructive opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+									<span className="absolute inset-0 w-26 text-destructive opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100">
 										Hold to confirm
 									</span>
 								</span>
