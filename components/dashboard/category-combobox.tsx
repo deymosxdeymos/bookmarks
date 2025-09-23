@@ -264,7 +264,7 @@ export function CategoryCombobox({
 			<PopoverTrigger asChild>
 				<Button
 					variant="ghost"
-					className="flex h-10 items-center gap-2 bg-card px-3 text-sm rounded-sm font-medium transition focus-visible:ring-2 focus-visible:ring-ring"
+					className="flex h-10 items-center gap-2 px-3 text-sm rounded-sm font-medium transition focus-visible:ring-2 focus-visible:ring-ring"
 					role="combobox"
 					aria-expanded={open}
 					aria-label="Select category"

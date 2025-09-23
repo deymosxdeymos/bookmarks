@@ -299,13 +299,10 @@ export function BookmarksSection({
 						focusIndex(links.length - 1);
 						break;
 					case "Enter":
+						event.preventDefault();
 						if (event.metaKey || event.ctrlKey) {
-							event.preventDefault();
 							const href = event.currentTarget.href;
 							if (href) window.open(href, "_blank", "noopener,noreferrer");
-						} else {
-							const href = event.currentTarget.href;
-							if (href) window.location.href = href;
 						}
 						break;
 					default:
