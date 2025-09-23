@@ -21,7 +21,6 @@ import {
 import { useCreateCategory, useDeleteCategory } from "@/lib/queries/categories";
 import type { Category } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
-import styles from "./category-combobox.module.css";
 
 const HOTKEY_SEQUENCE = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 const HOLD_DURATION_MS = 1000;
@@ -43,6 +42,7 @@ export function CategoryCombobox({
 	const [isHolding, setIsHolding] = useState(false);
 	const holdStartRef = useRef<number | null>(null);
 	const holdActiveRef = useRef(false);
+	const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const createFormRef = useRef<HTMLFormElement>(null);
@@ -100,6 +100,10 @@ export function CategoryCombobox({
 		setIsHolding(false);
 		holdStartRef.current = null;
 		holdActiveRef.current = false;
+		if (holdTimeoutRef.current) {
+			clearTimeout(holdTimeoutRef.current);
+			holdTimeoutRef.current = null;
+		}
 	}, []);
 
 	const handleDelete = useCallback(async () => {
@@ -116,19 +120,6 @@ export function CategoryCombobox({
 		}
 	}, [applySelection, current?.id, deleteCategoryMutation, resetHoldState]);
 
-	const maybeCommitDelete = useCallback(async () => {
-		if (!holdStartRef.current || !holdActiveRef.current) {
-			resetHoldState();
-			return;
-		}
-		const elapsed = performance.now() - holdStartRef.current;
-		if (elapsed >= HOLD_DURATION_MS) {
-			await handleDelete();
-		} else {
-			resetHoldState();
-		}
-	}, [handleDelete, resetHoldState]);
-
 	const beginHold = useCallback(() => {
 		if (
 			!current?.id ||
@@ -139,7 +130,11 @@ export function CategoryCombobox({
 		holdActiveRef.current = true;
 		holdStartRef.current = performance.now();
 		setIsHolding(true);
-	}, [current?.id, deleteCategoryMutation.isPending]);
+		holdTimeoutRef.current = setTimeout(async () => {
+			if (!holdActiveRef.current) return;
+			await handleDelete();
+		}, HOLD_DURATION_MS);
+	}, [current?.id, deleteCategoryMutation.isPending, handleDelete]);
 
 	const cancelHold = useCallback(() => {
 		resetHoldState();
@@ -318,10 +313,10 @@ export function CategoryCombobox({
 									event.stopPropagation();
 									beginHold();
 								}}
-								onPointerUp={async (event) => {
+								onPointerUp={(event) => {
 									event.preventDefault();
 									event.stopPropagation();
-									await maybeCommitDelete();
+									cancelHold();
 								}}
 								onPointerLeave={() => cancelHold()}
 								onPointerCancel={() => cancelHold()}
@@ -332,32 +327,26 @@ export function CategoryCombobox({
 										beginHold();
 									}
 								}}
-								onKeyUp={async (event) => {
+								onKeyUp={(event) => {
 									if (event.key === " " || event.key === "Enter") {
 										event.preventDefault();
 										event.stopPropagation();
-										await maybeCommitDelete();
+										cancelHold();
 									}
 								}}
 								data-holding={isHolding ? "true" : undefined}
 								aria-disabled={deleteCategoryMutation.isPending}
 								className={cn(
-									"group relative mt-1 flex items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] active:bg-destructive/15 touch-manipulation",
-									styles.deleteCommandItem,
+									"group mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] active:bg-destructive/15 touch-manipulation holdable",
 								)}
 							>
-								<div className={styles.deleteWrapper}>
-									<div className={cn(styles.deleteLayer, styles.deleteBase)}>
-										<Trash2 className={styles.deleteIcon} aria-hidden />
-										<span>Hold to Delete</span>
-									</div>
-									<div
-										className={cn(styles.deleteLayer, styles.deleteOverlay)}
-										aria-hidden
-									>
-										<Trash2 className={styles.deleteIcon} aria-hidden />
-										<span>Hold to Delete</span>
-									</div>
+								<div className="holdable-overlay" aria-hidden>
+									<Trash2 className="size-4" aria-hidden />
+									<span>Hold to Delete</span>
+								</div>
+								<div className="flex items-center gap-3 h-full text-muted-foreground">
+									<Trash2 className="size-4" aria-hidden />
+									<span>Hold to Delete</span>
 								</div>
 							</CommandItem>
 						) : null}
