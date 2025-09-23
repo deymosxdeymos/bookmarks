@@ -33,6 +33,7 @@ export function DashboardNav({ user, categories, filter }: DashboardNavProps) {
 				</Link>
 				<span className="text-lg text-muted-foreground">/</span>
 				<CategoryCombobox
+					userId={user.id}
 					categories={categories}
 					selectedId={filter.categoryId ?? null}
 				/>

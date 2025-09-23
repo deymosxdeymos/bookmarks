@@ -9,6 +9,9 @@ import {
 	bookmarkFilterSchema,
 	bookmarkRowSchema,
 	bookmarkRowsSchema,
+	type CategoryCreateInput,
+	categoryCreateSchema,
+	categoryRowSchema,
 	categoryRowsSchema,
 	mapBookmarkRow,
 	mapCategoryRow,
@@ -232,10 +235,17 @@ export async function getBookmark(
 export async function listCategories(userId: string) {
 	const result = await query(
 		`
-		SELECT id, user_id, name, color, created_at
-		FROM categories
-		WHERE user_id = $1
-		ORDER BY name ASC
+		SELECT c.id,
+			c.user_id,
+			c.name,
+			c.color,
+			c.created_at,
+			COUNT(b.id) AS bookmark_count
+		FROM categories c
+		LEFT JOIN bookmarks b ON b.category_id = c.id
+		WHERE c.user_id = $1
+		GROUP BY c.id
+		ORDER BY c.name ASC
 		`,
 		[userId],
 	);
@@ -247,6 +257,37 @@ export async function listCategories(userId: string) {
 
 function categoryTag(userId: string) {
 	return `categories:${userId}`;
+}
+
+export async function createCategory(
+	userId: string,
+	input: CategoryCreateInput,
+) {
+	const data = categoryCreateSchema.parse(input);
+	const result = await query(
+		`
+		INSERT INTO categories (user_id, name, color)
+		VALUES ($1, $2, $3)
+		RETURNING id, user_id, name, color, created_at
+		`,
+		[userId, data.name, data.color ?? null],
+	);
+
+	const row = categoryRowSchema.parse({
+		...result.rows[0],
+		bookmark_count: 0,
+	});
+	return mapCategoryRow(row);
+}
+
+export async function deleteCategory(userId: string, categoryId: string) {
+	await query(
+		`
+		DELETE FROM categories
+		WHERE id = $1 AND user_id = $2
+		`,
+		[categoryId, userId],
+	);
 }
 
 export async function listCategoriesCached(userId: string) {

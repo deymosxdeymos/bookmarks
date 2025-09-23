@@ -2,7 +2,6 @@
 
 import type { QueryKey } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -180,16 +179,6 @@ export function BookmarksSection({
 		[drainDeletionQueue],
 	);
 
-	const handleDeleteClick = useCallback(
-		(bookmark: Bookmark, event: React.MouseEvent) => {
-			event.preventDefault();
-			event.stopPropagation();
-			const index = items.findIndex((item) => item.id === bookmark.id);
-			deleteBookmark(bookmark, index, true);
-		},
-		[items, deleteBookmark],
-	);
-
 	const handleItemKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLAnchorElement>) => {
 			const links = queryLinks();
@@ -289,9 +278,20 @@ export function BookmarksSection({
 					case "ArrowDown":
 						focusIndex(currentIndex + 1);
 						break;
-					case "ArrowUp":
+					case "ArrowUp": {
+						if (currentIndex === 0) {
+							const commandInput = document.querySelector<HTMLInputElement>(
+								"[data-command-target]",
+							);
+							if (commandInput && !commandInput.disabled) {
+								event.preventDefault();
+								commandInput.focus({ preventScroll: true });
+								return;
+							}
+						}
 						focusIndex(currentIndex - 1);
 						break;
+					}
 					case "Home":
 						focusIndex(0);
 						break;
@@ -382,7 +382,7 @@ export function BookmarksSection({
 			{items.map((bookmark) => (
 				<li
 					key={bookmark.id}
-					className="group flex items-center justify-between rounded-lg px-3 py-2 transition hover:bg-accent focus-within:bg-accent"
+					className="group flex items-center justify-between rounded-lg px-3 py-2 focus-within:bg-accent hover:bg-accent motion-safe:transition-colors motion-safe:duration-200 motion-safe:ease-[var(--ease-out-quart)]"
 				>
 					<a
 						data-bookmark-link
@@ -412,11 +412,14 @@ export function BookmarksSection({
 							</span>
 						</div>
 					</a>
-					<div className="ml-3 flex items-center gap-2">
-						<time className="text-xs text-muted-foreground group-hover:hidden group-focus-within:hidden">
+					<div className="relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right">
+						<time className="self-center text-xs text-muted-foreground tabular-nums transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-0 group-focus-within:opacity-0">
 							{formatCreatedAt(bookmark.createdAt)}
 						</time>
-						<div className="hidden items-center gap-1 group-hover:flex group-focus-within:flex text-xs text-muted-foreground">
+						<div
+							aria-hidden
+							className="pointer-events-none absolute inset-0 flex items-center justify-end gap-2 text-xs text-muted-foreground opacity-0 transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-100 group-focus-within:opacity-100"
+						>
 							<span className="rounded border px-1.5 py-0.5 leading-none">
 								⌘
 							</span>
@@ -424,15 +427,6 @@ export function BookmarksSection({
 								Enter
 							</span>
 						</div>
-						<button
-							type="button"
-							onClick={(e) => handleDeleteClick(bookmark, e)}
-							className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 p-2 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all focus-visible:opacity-100 outline-none"
-							style={{ touchAction: "manipulation" }}
-							aria-label="Delete bookmark"
-						>
-							<Trash2 size={16} />
-						</button>
 					</div>
 				</li>
 			))}
