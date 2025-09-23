@@ -1,10 +1,12 @@
 "use client";
 
-import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback } from "react";
 import { BookmarksSection } from "@/components/dashboard/bookmarks-section";
 import { DashboardNav } from "@/components/dashboard/nav";
 import { PrimaryInput } from "@/components/dashboard/primary-input";
 import { Separator } from "@/components/ui/separator";
+import { useGlobalCategoryHotkeys } from "@/lib/hooks";
 import { bookmarksQueryKey, useBookmarks } from "@/lib/queries/bookmarks";
 import { useCategories } from "@/lib/queries/categories";
 import type { BookmarkFilter } from "@/lib/schemas";
@@ -42,6 +44,9 @@ function RowSkeleton({ count }: { count: number }) {
 }
 
 export function DashboardContent({ user, filter }: DashboardContentProps) {
+	const router = useRouter();
+	const searchParams = useSearchParams();
+
 	const {
 		data: bookmarksResult,
 		isLoading: bookmarksLoading,
@@ -50,6 +55,25 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 	const { data: categories = [], error: categoriesError } = useCategories(
 		user.id,
 	);
+
+	const handleCategoryChange = useCallback(
+		(categoryId: string | null) => {
+			const params = new URLSearchParams(searchParams.toString());
+			if (categoryId) {
+				params.set("category", categoryId);
+			} else {
+				params.delete("category");
+			}
+			params.delete("cursor");
+			router.replace(`?${params.toString()}`, { scroll: false });
+		},
+		[router, searchParams],
+	);
+
+	useGlobalCategoryHotkeys({
+		categories,
+		onCategoryChange: handleCategoryChange,
+	});
 
 	if (bookmarksError) {
 		console.error("failed to load bookmarks", bookmarksError);
