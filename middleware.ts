@@ -1,11 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
 	const url = request.nextUrl;
 	const pathname = url.pathname;
 
-	const sessionCookie = request.cookies.get("better-auth.session_token");
-	const isAuthenticated = Boolean(sessionCookie?.value);
+	// Use the same session validation as pages
+	const session = await auth.api.getSession({
+		headers: request.headers,
+	});
+	const isAuthenticated = Boolean(session);
 
 	const isPublicAuthRoute =
 		pathname === "/" ||
