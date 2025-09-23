@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ModeToggle } from "@/components/mode-toggle";
-import { TextEntranceAnimation } from "@/components/text-entrance-animation";
+import { SectionEntranceAnimation } from "@/components/section-entrance-animation";
 import { Asterisk } from "@/components/ui/asterisk";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -15,7 +15,7 @@ export default async function Home() {
 	}
 	return (
 		<>
-			<TextEntranceAnimation delay={100}>
+			<SectionEntranceAnimation delay={0.1}>
 				<header className="fixed top-0 left-0 right-0 z-20 bg-background">
 					<div className="flex items-center justify-between px-4 py-2">
 						<Asterisk />
@@ -29,11 +29,11 @@ export default async function Home() {
 						</div>
 					</div>
 				</header>
-			</TextEntranceAnimation>
+			</SectionEntranceAnimation>
 			<div className="bg-background font-sans min-h-screen max-w-xl flex items-center justify-center p-8 pt-20 mx-auto">
 				<main className="flex flex-col w-full">
 					<div className="space-y-6">
-						<TextEntranceAnimation delay={200}>
+						<SectionEntranceAnimation delay={0.2}>
 							<div className="flex flex-col gap-2">
 								<h1 className="text-md text-foreground font-light">
 									bookmarks
@@ -44,8 +44,8 @@ export default async function Home() {
 									though.
 								</p>
 							</div>
-						</TextEntranceAnimation>
-						<TextEntranceAnimation delay={300}>
+						</SectionEntranceAnimation>
+						<SectionEntranceAnimation delay={0.3}>
 							<div className="flex flex-col gap-2">
 								<h1 className="text-md text-foreground font-light">about</h1>
 								<p className="text-md text-muted-foreground font-light text-justify">
@@ -57,8 +57,8 @@ export default async function Home() {
 									ever.
 								</p>
 							</div>
-						</TextEntranceAnimation>
-						<TextEntranceAnimation delay={500}>
+						</SectionEntranceAnimation>
+						<SectionEntranceAnimation delay={0.5}>
 							<div className="flex flex-col gap-2">
 								<h1 className="text-md text-foreground font-light">credits</h1>
 								<p className="text-md text-muted-foreground font-light text-justify">
@@ -69,9 +69,9 @@ export default async function Home() {
 									for inspiring me to made this.
 								</p>
 							</div>
-						</TextEntranceAnimation>
+						</SectionEntranceAnimation>
 						<Separator />
-						<TextEntranceAnimation delay={600}>
+						<SectionEntranceAnimation delay={0.6}>
 							<footer className="flex justify-between items-center">
 								<i className="text-xs text-muted-foreground font-light">
 									v0.01
@@ -89,7 +89,7 @@ export default async function Home() {
 									</Button>
 								</Link>
 							</footer>
-						</TextEntranceAnimation>
+						</SectionEntranceAnimation>
 					</div>
 				</main>
 			</div>

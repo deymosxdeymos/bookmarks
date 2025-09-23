@@ -43,6 +43,7 @@ export function CategoryCombobox({
 	const [isHoldActive, setIsHoldActive] = useState(false);
 	const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const holdProgressRef = useRef<HTMLDivElement>(null);
+	const deleteItemRef = useRef<HTMLDivElement>(null);
 	const reducedMotionRef = useRef(false);
 	const router = useRouter();
 	const searchParams = useSearchParams();
@@ -94,7 +95,6 @@ export function CategoryCombobox({
 		[router, searchParams],
 	);
 
-	// Refs for stable keyboard handler
 	const optionHotkeysRef = useRef(optionHotkeys);
 	const applySelectionRef = useRef(applySelection);
 
@@ -106,15 +106,34 @@ export function CategoryCombobox({
 		}
 		if (holdProgressRef.current) {
 			if (reducedMotionRef.current) {
-				// Instant reset for reduced motion
 				holdProgressRef.current.style.transition = "none";
 				holdProgressRef.current.style.width = "0%";
 			} else {
-				// Smooth reset with proper easing
 				holdProgressRef.current.style.transition = `width ${RESET_ANIMATION_DURATION_MS}ms var(--ease-out-quart)`;
 				holdProgressRef.current.style.width = "0%";
 			}
 		}
+
+		// Reset text color progress
+		if (deleteItemRef.current) {
+			if (reducedMotionRef.current) {
+				deleteItemRef.current.style.transition = "none";
+				deleteItemRef.current.style.setProperty("--delete-text-progress", "0");
+			} else {
+				deleteItemRef.current.style.setProperty("--delete-text-progress", "0");
+			}
+		}
+
+		// Reset clip-path transitions
+		const clipElements = document.querySelectorAll("[data-delete-clip]");
+		clipElements.forEach((el) => {
+			if (reducedMotionRef.current) {
+				(el as HTMLElement).style.transition = "none";
+			} else {
+				(el as HTMLElement).style.transition =
+					`clip-path ${RESET_ANIMATION_DURATION_MS}ms var(--ease-out-quart)`;
+			}
+		});
 	}, []);
 
 	const handleDelete = useCallback(async () => {
@@ -137,29 +156,36 @@ export function CategoryCombobox({
 		resetHoldState();
 		setIsHoldActive(true);
 
-		// Immediate visual feedback
 		const progressEl = holdProgressRef.current;
+		const deleteEl = deleteItemRef.current;
+
 		if (progressEl) {
 			progressEl.style.transition = "none";
-			progressEl.style.width = "2%"; // Small initial progress
+			progressEl.style.width = "2%";
 
-			// Start main animation after immediate feedback
 			requestAnimationFrame(() => {
 				if (progressEl) {
 					if (reducedMotionRef.current) {
-						// Instant completion for reduced motion
 						progressEl.style.transition = "none";
 						progressEl.style.width = "100%";
+						// Instantly set text to destructive color for reduced motion
+						if (deleteEl) {
+							deleteEl.style.transition = "none";
+							deleteEl.style.setProperty("--delete-text-progress", "1");
+						}
 					} else {
-						// Smooth animation over entire hold duration with linear easing for consistent progress
 						progressEl.style.transition = `width ${HOLD_DURATION_MS}ms linear`;
 						progressEl.style.width = "100%";
+
+						// Animate text clip progress
+						if (deleteEl) {
+							deleteEl.style.setProperty("--delete-text-progress", "1");
+						}
 					}
 				}
 			});
 		}
 
-		// Use shorter duration for reduced motion since visual feedback is instant
 		const holdDuration = reducedMotionRef.current ? 300 : HOLD_DURATION_MS;
 		holdTimeoutRef.current = setTimeout(async () => {
 			holdTimeoutRef.current = null;
@@ -179,7 +205,6 @@ export function CategoryCombobox({
 		resetHoldState();
 	}, [isHoldActive, resetHoldState]);
 
-	// Store latest values in refs to avoid recreating keyboard handler
 	useEffect(() => {
 		optionHotkeysRef.current = optionHotkeys;
 		applySelectionRef.current = applySelection;
@@ -212,7 +237,6 @@ export function CategoryCombobox({
 		return () => media.removeEventListener("change", updateReducedMotion);
 	}, []);
 
-	// Create stable keyboard handler that uses refs to access latest values
 	const globalHotkeyHandler = useCallback((event: KeyboardEvent) => {
 		if (event.defaultPrevented || event.isComposing) return;
 		if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
@@ -392,11 +416,11 @@ export function CategoryCombobox({
 						)}
 						{current.id ? (
 							<CommandItem
+								ref={deleteItemRef}
 								value="__delete"
 								onSelect={(value) => {
-									// Prevent selection when this is the delete item
 									if (value === "__delete") {
-										return; // Don't execute selection
+										return;
 									}
 								}}
 								onPointerDown={(event) => {
@@ -413,7 +437,7 @@ export function CategoryCombobox({
 								onPointerLeave={() => cancelHold()}
 								onPointerCancel={() => cancelHold()}
 								onMouseDown={(event) => {
-									if (event.button !== 0) return; // Only left button
+									if (event.button !== 0) return;
 									event.preventDefault();
 									event.stopPropagation();
 									startHold();
@@ -439,6 +463,7 @@ export function CategoryCombobox({
 									}
 								}}
 								className="group relative mt-1 flex items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-medium text-destructive transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] active:bg-destructive/15 touch-manipulation"
+								style={{ "--delete-text-progress": "0" } as React.CSSProperties}
 							>
 								<div
 									ref={holdProgressRef}
@@ -448,13 +473,37 @@ export function CategoryCombobox({
 											"shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.4)]",
 									)}
 								/>
-								<Trash2 className="size-4 text-destructive" aria-hidden />
+								<Trash2 className="size-4 text-muted-foreground" aria-hidden />
 								<span className="relative z-10 text-sm font-medium">
-									<span className="text-destructive block transition-opacity duration-100 group-hover:opacity-0 group-focus-visible:opacity-0 group-active:opacity-0">
-										Delete Group
+									<span className="block transition-opacity duration-100 group-hover:opacity-0 group-focus-visible:opacity-0 group-active:opacity-0">
+										<span className="relative inline-block text-muted-foreground">
+											Delete Group
+											<span
+												className="absolute inset-0 text-destructive motion-reduce:transition-none"
+												data-delete-clip
+												style={{
+													clipPath: `inset(0 calc(100% - (var(--delete-text-progress, 0) * 100%)) 0 0)`,
+													transition: `clip-path ${HOLD_DURATION_MS}ms linear`,
+												}}
+											>
+												Delete Group
+											</span>
+										</span>
 									</span>
-									<span className="absolute inset-0 w-26 text-destructive opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100">
-										Hold to confirm
+									<span className="absolute inset-0 w-26 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100">
+										<span className="relative inline-block text-muted-foreground">
+											Hold to confirm
+											<span
+												className="absolute inset-0 text-destructive motion-reduce:transition-none"
+												data-delete-clip
+												style={{
+													clipPath: `inset(0 calc(100% - (var(--delete-text-progress, 0) * 100%)) 0 0)`,
+													transition: `clip-path ${HOLD_DURATION_MS}ms linear`,
+												}}
+											>
+												Hold to confirm
+											</span>
+										</span>
 									</span>
 								</span>
 							</CommandItem>
