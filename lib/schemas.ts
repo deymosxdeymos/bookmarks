@@ -66,7 +66,7 @@ export const categorySchema = z.object({
 	userId: z.string().min(1),
 	name: z.string().min(1),
 	color: z.string().optional().nullable(),
-	bookmarkCount: z.number().nonnegative().default(0),
+	bookmarkCount: z.number().nonnegative(),
 	createdAt: z.coerce.date(),
 });
 
@@ -77,7 +77,7 @@ export const categoryRowSchema = z.object({
 	user_id: z.string(),
 	name: z.string(),
 	color: z.string().nullable(),
-	bookmark_count: z.coerce.number().nonnegative().default(0),
+	bookmark_count: z.coerce.number().nonnegative(),
 	created_at: z.coerce.date(),
 });
 

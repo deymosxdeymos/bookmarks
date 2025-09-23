@@ -275,7 +275,7 @@ export async function createCategory(
 
 	const row = categoryRowSchema.parse({
 		...result.rows[0],
-		bookmark_count: 0,
+		bookmark_count: 0, // New categories always start with 0 bookmarks
 	});
 	return mapCategoryRow(row);
 }

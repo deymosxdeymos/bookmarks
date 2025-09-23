@@ -23,6 +23,7 @@ import type { Category } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
 const HOTKEY_SEQUENCE = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+const HOLD_DURATION_MS = 800;
 
 type CategoryComboboxProps = {
 	userId: string;
@@ -92,6 +93,10 @@ export function CategoryCombobox({
 		[router, searchParams],
 	);
 
+	// Refs for stable keyboard handler
+	const optionHotkeysRef = useRef(optionHotkeys);
+	const applySelectionRef = useRef(applySelection);
+
 	const resetHoldState = useCallback(() => {
 		holdActiveRef.current = false;
 		if (holdTimeoutRef.current) {
@@ -118,8 +123,6 @@ export function CategoryCombobox({
 			resetHoldState();
 		}
 	}, [applySelection, current?.id, deleteCategoryMutation, resetHoldState]);
-
-	const HOLD_DURATION_MS = 800;
 
 	const startHold = useCallback(() => {
 		if (!current?.id || deleteCategoryMutation.isPending) return;
@@ -151,6 +154,12 @@ export function CategoryCombobox({
 		resetHoldState();
 	}, [resetHoldState]);
 
+	// Store latest values in refs to avoid recreating keyboard handler
+	useEffect(() => {
+		optionHotkeysRef.current = optionHotkeys;
+		applySelectionRef.current = applySelection;
+	}, [optionHotkeys, applySelection]);
+
 	useEffect(() => {
 		if (isCreating) {
 			createInputRef.current?.focus();
@@ -175,40 +184,43 @@ export function CategoryCombobox({
 		return () => media.removeEventListener("change", update);
 	}, []);
 
+	// Create stable keyboard handler that uses refs to access latest values
+	const globalHotkeyHandler = useCallback((event: KeyboardEvent) => {
+		if (event.defaultPrevented || event.isComposing) return;
+		if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+			return;
+		}
+
+		const target = event.target;
+		if (target instanceof HTMLElement) {
+			if (target.isContentEditable) return;
+			const tagName = target.tagName;
+			if (
+				tagName === "INPUT" ||
+				tagName === "TEXTAREA" ||
+				tagName === "SELECT"
+			) {
+				return;
+			}
+		}
+
+		const pressed = event.key;
+		const binding = optionHotkeysRef.current.find(
+			(entry) => entry.hotkey === pressed,
+		);
+		if (!binding || binding.hotkey == null) {
+			return;
+		}
+
+		event.preventDefault();
+		applySelectionRef.current(binding.categoryId);
+		setOpen(false);
+	}, []);
+
 	useEffect(() => {
-		const handler = (event: KeyboardEvent) => {
-			if (event.defaultPrevented || event.isComposing) return;
-			if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
-				return;
-			}
-
-			const target = event.target;
-			if (target instanceof HTMLElement) {
-				if (target.isContentEditable) return;
-				const tagName = target.tagName;
-				if (
-					tagName === "INPUT" ||
-					tagName === "TEXTAREA" ||
-					tagName === "SELECT"
-				) {
-					return;
-				}
-			}
-
-			const pressed = event.key;
-			const binding = optionHotkeys.find((entry) => entry.hotkey === pressed);
-			if (!binding || binding.hotkey == null) {
-				return;
-			}
-
-			event.preventDefault();
-			applySelection(binding.categoryId);
-			setOpen(false);
-		};
-
-		document.addEventListener("keydown", handler);
-		return () => document.removeEventListener("keydown", handler);
-	}, [applySelection, optionHotkeys]);
+		document.addEventListener("keydown", globalHotkeyHandler);
+		return () => document.removeEventListener("keydown", globalHotkeyHandler);
+	}, [globalHotkeyHandler]);
 
 	const handleCreateSubmit: React.FormEventHandler<HTMLFormElement> = async (
 		event,
@@ -251,8 +263,8 @@ export function CategoryCombobox({
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>
 				<Button
-					variant="outline"
-					className="flex h-10 items-center gap-2 rounded-lg border border-border/80 bg-card px-3 text-sm font-medium shadow-sm transition focus-visible:ring-2 focus-visible:ring-ring"
+					variant="ghost"
+					className="flex h-10 items-center gap-2 bg-card px-3 text-sm rounded-sm font-medium transition focus-visible:ring-2 focus-visible:ring-ring"
 					role="combobox"
 					aria-expanded={open}
 					aria-label="Select category"
