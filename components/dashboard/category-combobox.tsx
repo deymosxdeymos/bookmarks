@@ -21,10 +21,10 @@ import {
 import { useCreateCategory, useDeleteCategory } from "@/lib/queries/categories";
 import type { Category } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
+import styles from "./category-combobox.module.css";
 
 const HOTKEY_SEQUENCE = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-const HOLD_DURATION_MS = 500;
-const RESET_ANIMATION_DURATION_MS = 200;
+const HOLD_DURATION_MS = 1000;
 
 type CategoryComboboxProps = {
 	userId: string;
@@ -40,11 +40,9 @@ export function CategoryCombobox({
 	const [open, setOpen] = useState(false);
 	const [isCreating, setIsCreating] = useState(false);
 	const [createValue, setCreateValue] = useState("");
-	const [isHoldActive, setIsHoldActive] = useState(false);
-	const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const holdProgressRef = useRef<HTMLDivElement>(null);
-	const deleteItemRef = useRef<HTMLDivElement>(null);
-	const reducedMotionRef = useRef(false);
+	const [isHolding, setIsHolding] = useState(false);
+	const holdStartRef = useRef<number | null>(null);
+	const holdActiveRef = useRef(false);
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const createFormRef = useRef<HTMLFormElement>(null);
@@ -99,41 +97,9 @@ export function CategoryCombobox({
 	const applySelectionRef = useRef(applySelection);
 
 	const resetHoldState = useCallback(() => {
-		setIsHoldActive(false);
-		if (holdTimeoutRef.current) {
-			clearTimeout(holdTimeoutRef.current);
-			holdTimeoutRef.current = null;
-		}
-		if (holdProgressRef.current) {
-			if (reducedMotionRef.current) {
-				holdProgressRef.current.style.transition = "none";
-				holdProgressRef.current.style.width = "0%";
-			} else {
-				holdProgressRef.current.style.transition = `width ${RESET_ANIMATION_DURATION_MS}ms var(--ease-out-quart)`;
-				holdProgressRef.current.style.width = "0%";
-			}
-		}
-
-		// Reset text color progress
-		if (deleteItemRef.current) {
-			if (reducedMotionRef.current) {
-				deleteItemRef.current.style.transition = "none";
-				deleteItemRef.current.style.setProperty("--delete-text-progress", "0");
-			} else {
-				deleteItemRef.current.style.setProperty("--delete-text-progress", "0");
-			}
-		}
-
-		// Reset clip-path transitions
-		const clipElements = document.querySelectorAll("[data-delete-clip]");
-		clipElements.forEach((el) => {
-			if (reducedMotionRef.current) {
-				(el as HTMLElement).style.transition = "none";
-			} else {
-				(el as HTMLElement).style.transition =
-					`clip-path ${RESET_ANIMATION_DURATION_MS}ms var(--ease-out-quart)`;
-			}
-		});
+		setIsHolding(false);
+		holdStartRef.current = null;
+		holdActiveRef.current = false;
 	}, []);
 
 	const handleDelete = useCallback(async () => {
@@ -150,60 +116,34 @@ export function CategoryCombobox({
 		}
 	}, [applySelection, current?.id, deleteCategoryMutation, resetHoldState]);
 
-	const startHold = useCallback(() => {
-		if (!current?.id || deleteCategoryMutation.isPending || isHoldActive)
+	const maybeCommitDelete = useCallback(async () => {
+		if (!holdStartRef.current || !holdActiveRef.current) {
+			resetHoldState();
 			return;
-		resetHoldState();
-		setIsHoldActive(true);
-
-		const progressEl = holdProgressRef.current;
-		const deleteEl = deleteItemRef.current;
-
-		if (progressEl) {
-			progressEl.style.transition = "none";
-			progressEl.style.width = "2%";
-
-			requestAnimationFrame(() => {
-				if (progressEl) {
-					if (reducedMotionRef.current) {
-						progressEl.style.transition = "none";
-						progressEl.style.width = "100%";
-						// Instantly set text to destructive color for reduced motion
-						if (deleteEl) {
-							deleteEl.style.transition = "none";
-							deleteEl.style.setProperty("--delete-text-progress", "1");
-						}
-					} else {
-						progressEl.style.transition = `width ${HOLD_DURATION_MS}ms linear`;
-						progressEl.style.width = "100%";
-
-						// Animate text clip progress
-						if (deleteEl) {
-							deleteEl.style.setProperty("--delete-text-progress", "1");
-						}
-					}
-				}
-			});
 		}
-
-		const holdDuration = reducedMotionRef.current ? 300 : HOLD_DURATION_MS;
-		holdTimeoutRef.current = setTimeout(async () => {
-			holdTimeoutRef.current = null;
-			setIsHoldActive(false);
+		const elapsed = performance.now() - holdStartRef.current;
+		if (elapsed >= HOLD_DURATION_MS) {
 			await handleDelete();
-		}, holdDuration);
-	}, [
-		current?.id,
-		deleteCategoryMutation.isPending,
-		handleDelete,
-		isHoldActive,
-		resetHoldState,
-	]);
+		} else {
+			resetHoldState();
+		}
+	}, [handleDelete, resetHoldState]);
+
+	const beginHold = useCallback(() => {
+		if (
+			!current?.id ||
+			deleteCategoryMutation.isPending ||
+			holdActiveRef.current
+		)
+			return;
+		holdActiveRef.current = true;
+		holdStartRef.current = performance.now();
+		setIsHolding(true);
+	}, [current?.id, deleteCategoryMutation.isPending]);
 
 	const cancelHold = useCallback(() => {
-		if (!isHoldActive) return;
 		resetHoldState();
-	}, [isHoldActive, resetHoldState]);
+	}, [resetHoldState]);
 
 	useEffect(() => {
 		optionHotkeysRef.current = optionHotkeys;
@@ -223,56 +163,6 @@ export function CategoryCombobox({
 			resetHoldState();
 		}
 	}, [open, resetHoldState]);
-
-	useEffect(() => {
-		const updateReducedMotion = () => {
-			const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-			reducedMotionRef.current = media.matches;
-		};
-
-		updateReducedMotion();
-		const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-		media.addEventListener("change", updateReducedMotion);
-
-		return () => media.removeEventListener("change", updateReducedMotion);
-	}, []);
-
-	const globalHotkeyHandler = useCallback((event: KeyboardEvent) => {
-		if (event.defaultPrevented || event.isComposing) return;
-		if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
-			return;
-		}
-
-		const target = event.target;
-		if (target instanceof HTMLElement) {
-			if (target.isContentEditable) return;
-			const tagName = target.tagName;
-			if (
-				tagName === "INPUT" ||
-				tagName === "TEXTAREA" ||
-				tagName === "SELECT"
-			) {
-				return;
-			}
-		}
-
-		const pressed = event.key;
-		const binding = optionHotkeysRef.current.find(
-			(entry) => entry.hotkey === pressed,
-		);
-		if (!binding || binding.hotkey == null) {
-			return;
-		}
-
-		event.preventDefault();
-		applySelectionRef.current(binding.categoryId);
-		setOpen(false);
-	}, []);
-
-	useEffect(() => {
-		document.addEventListener("keydown", globalHotkeyHandler);
-		return () => document.removeEventListener("keydown", globalHotkeyHandler);
-	}, [globalHotkeyHandler]);
 
 	const handleCreateSubmit: React.FormEventHandler<HTMLFormElement> = async (
 		event,
@@ -416,7 +306,6 @@ export function CategoryCombobox({
 						)}
 						{current.id ? (
 							<CommandItem
-								ref={deleteItemRef}
 								value="__delete"
 								onSelect={(value) => {
 									if (value === "__delete") {
@@ -427,85 +316,49 @@ export function CategoryCombobox({
 									if (event.button !== 0) return;
 									event.preventDefault();
 									event.stopPropagation();
-									startHold();
+									beginHold();
 								}}
-								onPointerUp={(event) => {
+								onPointerUp={async (event) => {
 									event.preventDefault();
 									event.stopPropagation();
-									cancelHold();
+									await maybeCommitDelete();
 								}}
 								onPointerLeave={() => cancelHold()}
 								onPointerCancel={() => cancelHold()}
-								onMouseDown={(event) => {
-									if (event.button !== 0) return;
-									event.preventDefault();
-									event.stopPropagation();
-									startHold();
-								}}
-								onMouseUp={(event) => {
-									event.preventDefault();
-									event.stopPropagation();
-									cancelHold();
-								}}
-								onMouseLeave={() => cancelHold()}
 								onKeyDown={(event) => {
 									if (event.key === " " || event.key === "Enter") {
 										event.preventDefault();
 										event.stopPropagation();
-										if (!isHoldActive) startHold();
+										beginHold();
 									}
 								}}
-								onKeyUp={(event) => {
+								onKeyUp={async (event) => {
 									if (event.key === " " || event.key === "Enter") {
 										event.preventDefault();
 										event.stopPropagation();
-										cancelHold();
+										await maybeCommitDelete();
 									}
 								}}
-								className="group relative mt-1 flex items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-medium text-destructive transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] active:bg-destructive/15 touch-manipulation"
-								style={{ "--delete-text-progress": "0" } as React.CSSProperties}
+								data-holding={isHolding ? "true" : undefined}
+								aria-disabled={deleteCategoryMutation.isPending}
+								className={cn(
+									"group relative mt-1 flex items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] active:bg-destructive/15 touch-manipulation",
+									styles.deleteCommandItem,
+								)}
 							>
-								<div
-									ref={holdProgressRef}
-									className={cn(
-										"pointer-events-none absolute inset-0 w-0 rounded-lg bg-destructive/30 transition-shadow duration-100",
-										isHoldActive &&
-											"shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.4)]",
-									)}
-								/>
-								<Trash2 className="size-4 text-muted-foreground" aria-hidden />
-								<span className="relative z-10 text-sm font-medium">
-									<span className="block transition-opacity duration-100 group-hover:opacity-0 group-focus-visible:opacity-0 group-active:opacity-0">
-										<span className="relative inline-block text-muted-foreground">
-											Delete Group
-											<span
-												className="absolute inset-0 text-destructive motion-reduce:transition-none"
-												data-delete-clip
-												style={{
-													clipPath: `inset(0 calc(100% - (var(--delete-text-progress, 0) * 100%)) 0 0)`,
-													transition: `clip-path ${HOLD_DURATION_MS}ms linear`,
-												}}
-											>
-												Delete Group
-											</span>
-										</span>
-									</span>
-									<span className="absolute inset-0 w-26 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100">
-										<span className="relative inline-block text-muted-foreground">
-											Hold to confirm
-											<span
-												className="absolute inset-0 text-destructive motion-reduce:transition-none"
-												data-delete-clip
-												style={{
-													clipPath: `inset(0 calc(100% - (var(--delete-text-progress, 0) * 100%)) 0 0)`,
-													transition: `clip-path ${HOLD_DURATION_MS}ms linear`,
-												}}
-											>
-												Hold to confirm
-											</span>
-										</span>
-									</span>
-								</span>
+								<div className={styles.deleteWrapper}>
+									<div className={cn(styles.deleteLayer, styles.deleteBase)}>
+										<Trash2 className={styles.deleteIcon} aria-hidden />
+										<span>Hold to Delete</span>
+									</div>
+									<div
+										className={cn(styles.deleteLayer, styles.deleteOverlay)}
+										aria-hidden
+									>
+										<Trash2 className={styles.deleteIcon} aria-hidden />
+										<span>Hold to Delete</span>
+									</div>
+								</div>
 							</CommandItem>
 						) : null}
 					</CommandList>
