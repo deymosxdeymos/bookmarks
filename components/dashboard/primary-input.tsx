@@ -40,14 +40,9 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 			if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
 				event.preventDefault();
 				inputRef.current?.focus();
+				return;
 			}
-		};
-		document.addEventListener("keydown", handler);
-		return () => document.removeEventListener("keydown", handler);
-	}, []);
 
-	useEffect(() => {
-		const handleArrowDown = (event: KeyboardEvent) => {
 			if (event.key !== "ArrowDown") {
 				return;
 			}
@@ -86,8 +81,8 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 			}
 		};
 
-		document.addEventListener("keydown", handleArrowDown);
-		return () => document.removeEventListener("keydown", handleArrowDown);
+		document.addEventListener("keydown", handler);
+		return () => document.removeEventListener("keydown", handler);
 	}, [focusFirstBookmark]);
 
 	const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {

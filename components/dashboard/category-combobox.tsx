@@ -175,8 +175,6 @@ export function CategoryCombobox({
 		return () => media.removeEventListener("change", update);
 	}, []);
 
-	useEffect(() => () => resetHoldState(), [resetHoldState]);
-
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
 			if (event.defaultPrevented || event.isComposing) return;
