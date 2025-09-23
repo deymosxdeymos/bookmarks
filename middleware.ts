@@ -6,10 +6,8 @@ export function middleware(request: NextRequest) {
 	const pathname = url.pathname;
 
 	try {
-		// Use cookie-based session validation with custom cookie name
-		const sessionCookie = getSessionCookie(request, {
-			cookieName: "better-auth.session_token",
-		});
+		// Use cookie-based session validation with default Better Auth configuration
+		const sessionCookie = getSessionCookie(request);
 		const isAuthenticated = Boolean(sessionCookie);
 
 		// Add logging for debugging
