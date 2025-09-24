@@ -130,9 +130,9 @@ export function CategoryCombobox({
 		holdActiveRef.current = true;
 		holdStartRef.current = performance.now();
 		setIsHolding(true);
-		holdTimeoutRef.current = setTimeout(async () => {
+		holdTimeoutRef.current = setTimeout(() => {
 			if (!holdActiveRef.current) return;
-			await handleDelete();
+			handleDelete();
 		}, HOLD_DURATION_MS);
 	}, [current?.id, deleteCategoryMutation.isPending, handleDelete]);
 
@@ -340,13 +340,17 @@ export function CategoryCombobox({
 									"group mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] active:bg-destructive/15 touch-manipulation holdable",
 								)}
 							>
+								<div className="flex items-center gap-3 h-full text-muted-foreground group-hover:hidden group-active:hidden">
+									<Trash2 className="size-4" aria-hidden />
+									<span>Delete Group</span>
+								</div>
+								<div className="hidden items-center gap-3 h-full text-muted-foreground group-hover:flex group-active:flex">
+									<Trash2 className="size-4" aria-hidden />
+									<span>Hold to Confirm</span>
+								</div>
 								<div className="holdable-overlay" aria-hidden>
 									<Trash2 className="size-4" aria-hidden />
-									<span>Hold to Delete</span>
-								</div>
-								<div className="flex items-center gap-3 h-full text-muted-foreground">
-									<Trash2 className="size-4" aria-hidden />
-									<span>Hold to Delete</span>
+									<span>Hold to Confirm</span>
 								</div>
 							</CommandItem>
 						) : null}
