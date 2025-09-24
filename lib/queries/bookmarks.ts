@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	createBookmarkAction,
 	deleteBookmarkAction,
+	setBookmarkCategoryAction,
+	updateBookmarkAction,
 } from "@/app/actions/bookmarks";
 import type { ListResult } from "@/lib/bookmarks-repo";
 import type {
@@ -148,6 +150,186 @@ export function useDeleteBookmark() {
 		onSettled: () => {
 			// Invalidate all bookmark queries to refetch
 			queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+		},
+	});
+}
+
+type UpdateBookmarkVariables = {
+	bookmarkId: string;
+	title: string;
+};
+
+function normalizeBookmarkDates(bookmark: Bookmark): Bookmark {
+	return {
+		...bookmark,
+		createdAt:
+			bookmark.createdAt instanceof Date
+				? bookmark.createdAt
+				: new Date(String(bookmark.createdAt)),
+		updatedAt:
+			bookmark.updatedAt instanceof Date
+				? bookmark.updatedAt
+				: new Date(String(bookmark.updatedAt)),
+	};
+}
+
+export function useUpdateBookmarkTitle() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({ bookmarkId, title }: UpdateBookmarkVariables) => {
+			const trimmed = title.trim();
+			return updateBookmarkAction(bookmarkId, { title: trimmed });
+		},
+		onMutate: async (variables) => {
+			await queryClient.cancelQueries({ queryKey: ["bookmarks"] });
+			const previousQueries = new Map(
+				queryClient.getQueriesData<ListResult>({ queryKey: ["bookmarks"] }),
+			);
+
+			for (const [queryKey, existing] of previousQueries) {
+				if (!existing?.items) continue;
+				const items = existing.items.map((item) =>
+					item.id === variables.bookmarkId
+						? {
+								...item,
+								title: variables.title.trim(),
+								updatedAt: new Date(),
+							}
+						: item,
+				);
+				queryClient.setQueryData<ListResult>(queryKey, {
+					...existing,
+					items,
+				});
+			}
+
+			return { previousQueries };
+		},
+		onError: (_error, _vars, context) => {
+			if (!context?.previousQueries) return;
+			context.previousQueries.forEach((data, key) => {
+				queryClient.setQueryData(key, data);
+			});
+		},
+		onSuccess: (bookmark) => {
+			if (!bookmark) return;
+			const converted = normalizeBookmarkDates(bookmark);
+			const queryEntries = queryClient.getQueriesData<ListResult>({
+				queryKey: ["bookmarks"],
+			});
+			for (const [queryKey, existing] of queryEntries) {
+				if (!existing?.items) continue;
+				const items = existing.items.map((item) =>
+					item.id === converted.id ? converted : item,
+				);
+				queryClient.setQueryData<ListResult>(queryKey, {
+					...existing,
+					items,
+				});
+			}
+		},
+		onSettled: () => {
+			queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+		},
+	});
+}
+
+type SetBookmarkCategoryVariables = {
+	bookmarkId: string;
+	categoryId: string | null;
+};
+
+export function useSetBookmarkCategory() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({
+			bookmarkId,
+			categoryId,
+		}: SetBookmarkCategoryVariables) => {
+			return setBookmarkCategoryAction(bookmarkId, categoryId);
+		},
+		onMutate: async (variables) => {
+			await queryClient.cancelQueries({ queryKey: ["bookmarks"] });
+			const previousQueries = new Map(
+				queryClient.getQueriesData<ListResult>({ queryKey: ["bookmarks"] }),
+			);
+
+			for (const [queryKey, existing] of previousQueries) {
+				if (!existing?.items) continue;
+				const [, params] = queryKey as BookmarksQueryKey;
+				const filterCategory = params?.categoryId ?? null;
+				const hasBookmark = existing.items.some(
+					(item) => item.id === variables.bookmarkId,
+				);
+				if (!hasBookmark) continue;
+
+				const shouldKeep =
+					filterCategory === null || filterCategory === variables.categoryId;
+				const items = shouldKeep
+					? existing.items.map((item) =>
+							item.id === variables.bookmarkId
+								? { ...item, categoryId: variables.categoryId }
+								: item,
+						)
+					: existing.items.filter((item) => item.id !== variables.bookmarkId);
+
+				queryClient.setQueryData<ListResult>(queryKey, {
+					...existing,
+					items,
+				});
+			}
+
+			return { previousQueries };
+		},
+		onError: (_error, _vars, context) => {
+			if (!context?.previousQueries) return;
+			context.previousQueries.forEach((data, key) => {
+				queryClient.setQueryData(key, data);
+			});
+		},
+		onSuccess: (bookmark, _variables) => {
+			if (!bookmark) return;
+			const converted = normalizeBookmarkDates(bookmark);
+			const queryEntries = queryClient.getQueriesData<ListResult>({
+				queryKey: ["bookmarks"],
+			});
+			for (const [queryKey, existing] of queryEntries) {
+				if (!existing?.items) continue;
+				const [, params] = queryKey as BookmarksQueryKey;
+				const filterCategory = params?.categoryId ?? null;
+
+				const shouldContain =
+					filterCategory === null || filterCategory === converted.categoryId;
+				const alreadyContains = existing.items.some(
+					(item) => item.id === converted.id,
+				);
+
+				if (!shouldContain && alreadyContains) {
+					queryClient.setQueryData<ListResult>(queryKey, {
+						...existing,
+						items: existing.items.filter((item) => item.id !== converted.id),
+					});
+					continue;
+				}
+
+				if (shouldContain) {
+					const nextItems = alreadyContains
+						? existing.items.map((item) =>
+								item.id === converted.id ? converted : item,
+							)
+						: [...existing.items, converted];
+					queryClient.setQueryData<ListResult>(queryKey, {
+						...existing,
+						items: nextItems,
+					});
+				}
+			}
+		},
+		onSettled: () => {
+			queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+			queryClient.invalidateQueries({ queryKey: ["categories"] });
 		},
 	});
 }

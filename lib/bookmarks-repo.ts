@@ -5,10 +5,12 @@ import {
 	type Bookmark,
 	type BookmarkCreateInput,
 	type BookmarkFilter,
+	type BookmarkUpdateInput,
 	bookmarkCreateSchema,
 	bookmarkFilterSchema,
 	bookmarkRowSchema,
 	bookmarkRowsSchema,
+	bookmarkUpdateSchema,
 	type CategoryCreateInput,
 	categoryCreateSchema,
 	categoryRowSchema,
@@ -209,6 +211,30 @@ export async function deleteBookmark(
 		bookmarkId,
 		userId,
 	]);
+}
+
+export async function updateBookmark(
+	userId: string,
+	bookmarkId: string,
+	input: BookmarkUpdateInput,
+): Promise<Bookmark | null> {
+	const data = bookmarkUpdateSchema.parse(input);
+	const result = await query(
+		`
+		UPDATE bookmarks
+		SET title = $1, updated_at = NOW()
+		WHERE id = $2 AND user_id = $3
+		RETURNING ${selectColumns}
+		`,
+		[data.title, bookmarkId, userId],
+	);
+
+	if (result.rows.length === 0) {
+		return null;
+	}
+
+	const row = bookmarkRowSchema.parse(result.rows[0]);
+	return mapBookmarkRow(row);
 }
 
 export async function getBookmark(

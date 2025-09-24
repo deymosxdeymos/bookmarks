@@ -120,6 +120,7 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 						<BookmarksSection
 							initialItems={enrichedItems}
 							queryKey={queryKey}
+							categories={categories}
 						/>
 					)}
 				</Suspense>

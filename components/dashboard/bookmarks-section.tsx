@@ -2,17 +2,34 @@
 
 import type { QueryKey } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
+import { Check } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type FormEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { toast } from "sonner";
+import { BookmarkContextMenu } from "@/components/dashboard/bookmark-context-menu";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { ListResult } from "@/lib/bookmarks-repo";
 import { fallbackIcon } from "@/lib/metadata";
-import { useDeleteBookmark } from "@/lib/queries/bookmarks";
-import type { Bookmark } from "@/lib/schemas";
+import {
+	useDeleteBookmark,
+	useSetBookmarkCategory,
+	useUpdateBookmarkTitle,
+} from "@/lib/queries/bookmarks";
+import type { Bookmark, Category } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 
 type BookmarksSectionProps = {
 	initialItems: Bookmark[];
 	queryKey: QueryKey;
+	categories: Category[];
 };
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -28,16 +45,63 @@ function formatCreatedAt(value: unknown): string {
 export function BookmarksSection({
 	initialItems,
 	queryKey,
+	categories,
 }: BookmarksSectionProps) {
 	const rootRef = useRef<HTMLUListElement>(null);
 	const queryClient = useQueryClient();
 	const { mutate: mutateBookmark } = useDeleteBookmark();
+	const updateBookmarkMutation = useUpdateBookmarkTitle();
+	const setBookmarkCategoryMutation = useSetBookmarkCategory();
 	const [undoStackVersion, setUndoStackVersion] = useState(0);
 	const latestInitialItemsRef = useRef(initialItems);
+	const [activeEditId, setActiveEditId] = useState<string | null>(null);
+	const [editDraft, setEditDraft] = useState("");
+	const [pendingEditId, setPendingEditId] = useState<string | null>(null);
+	const [feedback, setFeedback] = useState<{
+		id: string;
+		type: "copied" | "renamed";
+	} | null>(null);
+	const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const lastFocusedBookmarkIdRef = useRef<string | null>(null);
+	const inlineEditInputRef = useRef<HTMLInputElement | null>(null);
+	const previousActiveEditIdRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		latestInitialItemsRef.current = initialItems;
 	}, [initialItems]);
+
+	useEffect(() => {
+		if (!activeEditId) return;
+		const frame = requestAnimationFrame(() => {
+			const input = inlineEditInputRef.current;
+			if (input) {
+				input.focus({ preventScroll: true });
+				input.select();
+			}
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [activeEditId]);
+
+	useEffect(() => {
+		return () => {
+			if (feedbackTimeoutRef.current) {
+				clearTimeout(feedbackTimeoutRef.current);
+			}
+		};
+	}, []);
+
+	useEffect(() => {
+		if (previousActiveEditIdRef.current && activeEditId === null) {
+			const activeId = lastFocusedBookmarkIdRef.current;
+			if (activeId) {
+				const selector = `[data-bookmark-link][data-bookmark-id="${activeId}"]`;
+				const target =
+					rootRef.current?.querySelector<HTMLAnchorElement>(selector);
+				target?.focus({ preventScroll: true });
+			}
+		}
+		previousActiveEditIdRef.current = activeEditId;
+	}, [activeEditId]);
 
 	const deleteIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const isKeyHeldRef = useRef(false);
@@ -59,6 +123,118 @@ export function BookmarksSection({
 		);
 		return baseItems.filter((item) => !pendingDeleteIds.has(item.id));
 	}, [getCurrentItems]);
+
+	const triggerFeedback = useCallback(
+		(bookmarkId: string, type: "copied" | "renamed") => {
+			if (feedbackTimeoutRef.current) {
+				clearTimeout(feedbackTimeoutRef.current);
+			}
+			setFeedback({ id: bookmarkId, type });
+			feedbackTimeoutRef.current = setTimeout(() => {
+				setFeedback(null);
+				feedbackTimeoutRef.current = null;
+			}, 1400);
+		},
+		[],
+	);
+
+	const handleCopyBookmark = useCallback(
+		async (bookmark: Bookmark) => {
+			lastFocusedBookmarkIdRef.current = bookmark.id;
+			try {
+				if (navigator?.clipboard?.writeText) {
+					await navigator.clipboard.writeText(bookmark.url);
+				} else if (typeof document !== "undefined") {
+					const textarea = document.createElement("textarea");
+					textarea.value = bookmark.url;
+					textarea.setAttribute("readonly", "");
+					textarea.style.position = "absolute";
+					textarea.style.left = "-9999px";
+					document.body.appendChild(textarea);
+					textarea.select();
+					document.execCommand("copy");
+					document.body.removeChild(textarea);
+				} else {
+					throw new Error("Clipboard API unavailable");
+				}
+				triggerFeedback(bookmark.id, "copied");
+				toast.success("Copied");
+			} catch (error) {
+				console.error("copy bookmark failed", error);
+				toast.error("Could not copy link.");
+			}
+		},
+		[triggerFeedback],
+	);
+
+	const startInlineRename = useCallback((bookmark: Bookmark) => {
+		lastFocusedBookmarkIdRef.current = bookmark.id;
+		setActiveEditId(bookmark.id);
+		setEditDraft(bookmark.title);
+	}, []);
+
+	const cancelInlineRename = useCallback(() => {
+		setActiveEditId(null);
+		setEditDraft("");
+		setPendingEditId(null);
+	}, []);
+
+	const commitInlineRename = useCallback(async () => {
+		if (!activeEditId) return;
+		const trimmed = editDraft.trim();
+		if (!trimmed) {
+			toast.error("Title cannot be empty.");
+			return;
+		}
+		try {
+			setPendingEditId(activeEditId);
+			await updateBookmarkMutation.mutateAsync({
+				bookmarkId: activeEditId,
+				title: trimmed,
+			});
+			triggerFeedback(activeEditId, "renamed");
+			toast.success("Updated title");
+			setActiveEditId(null);
+			setEditDraft("");
+			lastFocusedBookmarkIdRef.current = activeEditId;
+		} catch (error) {
+			console.error("rename bookmark failed", error);
+			toast.error("Could not update title.");
+		} finally {
+			setPendingEditId(null);
+		}
+	}, [activeEditId, editDraft, triggerFeedback, updateBookmarkMutation]);
+
+	const handleInlineEditSubmit = useCallback(
+		(event: FormEvent<HTMLFormElement>) => {
+			event.preventDefault();
+			void commitInlineRename();
+		},
+		[commitInlineRename],
+	);
+
+	const handleMoveBookmark = useCallback(
+		async (bookmark: Bookmark, categoryId: string | null) => {
+			if (bookmark.categoryId === categoryId) return;
+			lastFocusedBookmarkIdRef.current = bookmark.id;
+			try {
+				await setBookmarkCategoryMutation.mutateAsync({
+					bookmarkId: bookmark.id,
+					categoryId,
+				});
+				const targetLabel =
+					categoryId == null
+						? "No group"
+						: (categories.find((category) => category.id === categoryId)
+								?.name ?? "Selected group");
+				toast.success(`Moved to ${targetLabel}`);
+			} catch (error) {
+				console.error("move bookmark failed", error);
+				toast.error("Could not move bookmark.");
+			}
+		},
+		[categories, setBookmarkCategoryMutation],
+	);
 
 	const items = useMemo(() => {
 		void undoStackVersion;
@@ -184,6 +360,10 @@ export function BookmarksSection({
 			const links = queryLinks();
 			if (!links || links.length === 0) return;
 			const currentIndex = Array.from(links).indexOf(event.currentTarget);
+			const currentId = event.currentTarget.getAttribute("data-bookmark-id");
+			if (currentId) {
+				lastFocusedBookmarkIdRef.current = currentId;
+			}
 
 			const focusIndex = (index: number) => {
 				const nextIndex = Math.max(0, Math.min(links.length - 1, index));
@@ -268,6 +448,26 @@ export function BookmarksSection({
 				}
 			} else if (
 				(event.metaKey || event.ctrlKey) &&
+				event.key.toLowerCase() === "c"
+			) {
+				event.preventDefault();
+				const bookmarkId = event.currentTarget.getAttribute("data-bookmark-id");
+				const bookmark = items.find((item) => item.id === bookmarkId);
+				if (bookmark) {
+					void handleCopyBookmark(bookmark);
+				}
+			} else if (
+				(event.metaKey || event.ctrlKey) &&
+				event.key.toLowerCase() === "e"
+			) {
+				event.preventDefault();
+				const bookmarkId = event.currentTarget.getAttribute("data-bookmark-id");
+				const bookmark = items.find((item) => item.id === bookmarkId);
+				if (bookmark) {
+					startInlineRename(bookmark);
+				}
+			} else if (
+				(event.metaKey || event.ctrlKey) &&
 				event.key.toLowerCase() === "z" &&
 				!event.shiftKey
 			) {
@@ -310,7 +510,15 @@ export function BookmarksSection({
 				}
 			}
 		},
-		[queryLinks, items, deleteBookmark, undoDelete, getVisibleItems],
+		[
+			queryLinks,
+			items,
+			deleteBookmark,
+			undoDelete,
+			getVisibleItems,
+			handleCopyBookmark,
+			startInlineRename,
+		],
 	);
 
 	useEffect(() => {
@@ -333,11 +541,49 @@ export function BookmarksSection({
 		};
 
 		const handleGlobalKeyDown = (event: KeyboardEvent) => {
+			const modifier = event.metaKey || event.ctrlKey;
+			if (!modifier) {
+				return;
+			}
+
+			if (activeEditId) {
+				return;
+			}
+
+			const target = event.target as HTMLElement | null;
+			if (target) {
+				if (
+					target.isContentEditable ||
+					target.tagName === "INPUT" ||
+					target.tagName === "TEXTAREA" ||
+					target.tagName === "SELECT"
+				) {
+					return;
+				}
+			}
+
+			const key = event.key.toLowerCase();
 			if (
 				(event.metaKey || event.ctrlKey) &&
-				event.key.toLowerCase() === "z" &&
-				!event.shiftKey
+				!event.shiftKey &&
+				(key === "c" || key === "e")
 			) {
+				const activeId = lastFocusedBookmarkIdRef.current;
+				if (!activeId) return;
+				const currentItems = getVisibleItems();
+				const bookmark = currentItems.find((item) => item.id === activeId);
+				if (!bookmark) return;
+				event.preventDefault();
+				event.stopPropagation();
+				if (key === "c") {
+					void handleCopyBookmark(bookmark);
+				} else {
+					startInlineRename(bookmark);
+				}
+				return;
+			}
+
+			if ((event.metaKey || event.ctrlKey) && key === "z" && !event.shiftKey) {
 				if (undoStackRef.current.length > 0) {
 					event.preventDefault();
 					event.stopPropagation();
@@ -359,7 +605,14 @@ export function BookmarksSection({
 			}
 			drainDeletionQueue({ suppressStateUpdates: true });
 		};
-	}, [undoDelete, drainDeletionQueue]);
+	}, [
+		undoDelete,
+		drainDeletionQueue,
+		getVisibleItems,
+		handleCopyBookmark,
+		startInlineRename,
+		activeEditId,
+	]);
 
 	if (items.length === 0) {
 		return (
@@ -376,57 +629,195 @@ export function BookmarksSection({
 			aria-label="Bookmarks"
 			className="flex flex-col gap-1"
 		>
-			{items.map((bookmark) => (
-				<li
-					key={bookmark.id}
-					className="group flex items-center justify-between rounded-lg px-3 py-2 focus-within:bg-accent hover:bg-accent motion-safe:transition-colors motion-safe:duration-200 motion-safe:ease-[var(--ease-out-quart)]"
-				>
-					<a
-						data-bookmark-link
-						data-bookmark-id={bookmark.id}
-						href={bookmark.url}
-						target="_blank"
-						rel="noreferrer"
-						onKeyDown={handleItemKeyDown}
-						className="flex max-w-[75%] items-center gap-3 rounded-md outline-none focus-visible:bg-transparent focus:bg-transparent"
-						style={{ touchAction: "manipulation" }}
-					>
-						<Image
-							src={bookmark.iconUrl ?? fallbackIcon(bookmark.domain)}
-							alt=""
-							height={32}
-							width={32}
-							className="size-8 rounded-md border bg-muted object-cover"
-							unoptimized
-							referrerPolicy="no-referrer"
-						/>
-						<div className="flex flex-col gap-1">
-							<span className="truncate text-sm font-medium text-foreground">
-								{bookmark.title}
-							</span>
-							<span className="truncate text-xs text-muted-foreground">
-								{bookmark.domain}
-							</span>
-						</div>
-					</a>
-					<div className="relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right">
-						<time className="self-center text-xs text-muted-foreground tabular-nums transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-0 group-focus-within:opacity-0">
-							{formatCreatedAt(bookmark.createdAt)}
-						</time>
-						<div
-							aria-hidden
-							className="pointer-events-none absolute inset-0 flex items-center justify-end gap-2 text-xs text-muted-foreground opacity-0 transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-100 group-focus-within:opacity-100"
+			{items.map((bookmark, index) => {
+				const isFeedbackTarget = feedback?.id === bookmark.id;
+				const isEditing = activeEditId === bookmark.id;
+				const shouldDim = activeEditId !== null && !isEditing;
+				const showCopyFeedback =
+					isFeedbackTarget && feedback?.type === "copied";
+				const showRenameFeedback =
+					isFeedbackTarget && feedback?.type === "renamed";
+
+				const listItemClassName = cn(
+					"group relative flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-[var(--ease-out-quart)]",
+					!isEditing && "hover:bg-accent focus-within:bg-accent",
+					(isEditing || showRenameFeedback) &&
+						"bg-amber-100 text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300",
+					showRenameFeedback &&
+						!isEditing &&
+						"motion-safe:animate-in motion-safe:fade-in-0",
+					shouldDim && "opacity-40 motion-safe:blur-[2px]",
+				);
+
+				const listItemChildren = (
+					<>
+						{showCopyFeedback ? (
+							<div className="pointer-events-none absolute left-3 top-2 flex items-center gap-2 rounded-full bg-background/95 px-3 py-1 text-xs font-medium text-foreground shadow-sm motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200 motion-safe:ease-[var(--ease-out-quart)]">
+								<Check className="size-3" />
+								Copied
+							</div>
+						) : null}
+						{isEditing ? (
+							<form
+								className="flex w-full items-center justify-between gap-3"
+								onSubmit={handleInlineEditSubmit}
+								onKeyDown={(event) => {
+									if (event.key === "Escape") {
+										event.preventDefault();
+										cancelInlineRename();
+									}
+								}}
+							>
+								<div className="flex flex-1 items-center gap-3">
+									<Image
+										src={bookmark.iconUrl ?? fallbackIcon(bookmark.domain)}
+										alt=""
+										height={32}
+										width={32}
+										className="size-8 shrink-0 rounded-md border bg-muted object-cover"
+										unoptimized
+										referrerPolicy="no-referrer"
+									/>
+									<div className="flex flex-1 flex-col gap-1">
+										<Input
+											ref={inlineEditInputRef}
+											value={editDraft}
+											onChange={(event) => setEditDraft(event.target.value)}
+											onFocus={() => {
+												lastFocusedBookmarkIdRef.current = bookmark.id;
+											}}
+											onKeyDown={(event) => {
+												if (event.key === "Escape") {
+													event.preventDefault();
+													cancelInlineRename();
+												}
+											}}
+											aria-label={`Edit title for ${bookmark.domain}`}
+											disabled={pendingEditId === bookmark.id}
+											maxLength={256}
+											className="h-8 w-full text-sm"
+										/>
+										<span className="truncate text-xs text-muted-foreground">
+											{bookmark.domain}
+										</span>
+									</div>
+								</div>
+								<div className="flex items-center gap-2">
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										onClick={cancelInlineRename}
+										disabled={pendingEditId === bookmark.id}
+									>
+										Cancel
+									</Button>
+									<Button
+										type="submit"
+										size="sm"
+										disabled={pendingEditId === bookmark.id}
+										className="bg-foreground text-background hover:bg-foreground/90"
+									>
+										{pendingEditId === bookmark.id ? "Saving…" : "Save"}
+									</Button>
+								</div>
+							</form>
+						) : (
+							<>
+								<a
+									data-bookmark-link
+									data-bookmark-id={bookmark.id}
+									href={bookmark.url}
+									target="_blank"
+									rel="noreferrer"
+									onKeyDown={handleItemKeyDown}
+									onFocus={() => {
+										lastFocusedBookmarkIdRef.current = bookmark.id;
+									}}
+									onPointerDown={() => {
+										lastFocusedBookmarkIdRef.current = bookmark.id;
+									}}
+									onMouseEnter={() => {
+										lastFocusedBookmarkIdRef.current = bookmark.id;
+									}}
+									className="flex max-w-[75%] items-center gap-3 rounded-md outline-none focus-visible:bg-transparent focus:bg-transparent"
+									style={{ touchAction: "manipulation" }}
+								>
+									<Image
+										src={bookmark.iconUrl ?? fallbackIcon(bookmark.domain)}
+										alt=""
+										height={32}
+										width={32}
+										className="size-8 rounded-md border bg-muted object-cover"
+										unoptimized
+										referrerPolicy="no-referrer"
+									/>
+									<div className="flex flex-col gap-1">
+										<span className="truncate text-sm font-medium text-foreground">
+											{bookmark.title}
+										</span>
+										<span className="truncate text-xs text-muted-foreground">
+											{bookmark.domain}
+										</span>
+									</div>
+								</a>
+								<div className="relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right">
+									<time className="self-center text-xs text-muted-foreground tabular-nums transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-0 group-focus-within:opacity-0">
+										{formatCreatedAt(bookmark.createdAt)}
+									</time>
+									<div
+										aria-hidden
+										className="pointer-events-none absolute inset-0 flex items-center justify-end gap-2 text-xs text-muted-foreground opacity-0 transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-100 group-focus-within:opacity-100"
+									>
+										<span className="rounded border px-1.5 py-0.5 leading-none">
+											⌘
+										</span>
+										<span className="rounded border px-1.5 py-0.5 leading-none">
+											Enter
+										</span>
+									</div>
+								</div>
+							</>
+						)}
+					</>
+				);
+
+				if (isEditing) {
+					return (
+						<li
+							key={bookmark.id}
+							className={listItemClassName}
+							data-editing="true"
 						>
-							<span className="rounded border px-1.5 py-0.5 leading-none">
-								⌘
-							</span>
-							<span className="rounded border px-1.5 py-0.5 leading-none">
-								Enter
-							</span>
-						</div>
-					</div>
-				</li>
-			))}
+							{listItemChildren}
+						</li>
+					);
+				}
+
+				return (
+					<BookmarkContextMenu
+						key={bookmark.id}
+						bookmark={bookmark}
+						categories={categories}
+						onCopy={() => {
+							void handleCopyBookmark(bookmark);
+						}}
+						onRename={() => startInlineRename(bookmark)}
+						onDelete={() => {
+							if (activeEditId === bookmark.id) {
+								cancelInlineRename();
+							}
+							lastFocusedBookmarkIdRef.current = bookmark.id;
+							deleteBookmark(bookmark, index, true);
+						}}
+						onMove={(categoryId) => {
+							void handleMoveBookmark(bookmark, categoryId);
+						}}
+					>
+						<li className={listItemClassName}>{listItemChildren}</li>
+					</BookmarkContextMenu>
+				);
+			})}
 		</ul>
 	);
 }

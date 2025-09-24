@@ -26,14 +26,17 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 		return true;
 	}, []);
 
-	const handleSubmit = async (rawUrl: string) => {
-		let url = rawUrl.trim();
-		if (!/^\w[\w+.-]*:/.test(url)) {
-			url = `https://${url}`;
-		}
-		await createBookmarkMutation.mutateAsync({ url, categoryId });
-		formRef.current?.reset();
-	};
+	const handleSubmit = useCallback(
+		async (rawUrl: string) => {
+			let url = rawUrl.trim();
+			if (!/^\w[\w+.-]*:/.test(url)) {
+				url = `https://${url}`;
+			}
+			await createBookmarkMutation.mutateAsync({ url, categoryId });
+			formRef.current?.reset();
+		},
+		[categoryId, createBookmarkMutation],
+	);
 
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
@@ -84,6 +87,43 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 		document.addEventListener("keydown", handler);
 		return () => document.removeEventListener("keydown", handler);
 	}, [focusFirstBookmark]);
+
+	useEffect(() => {
+		const handlePaste = (event: ClipboardEvent) => {
+			const target = event.target as HTMLElement | null;
+			if (target) {
+				const editable = target.closest(
+					'input, textarea, [contenteditable="true"], [contenteditable=""], [role="textbox"]',
+				);
+				if (editable) {
+					return;
+				}
+			}
+
+			if (createBookmarkMutation.isPending) {
+				return;
+			}
+
+			const clipboardText = event.clipboardData?.getData("text") ?? "";
+			const trimmed = clipboardText.trim();
+			if (!trimmed) {
+				return;
+			}
+
+			const firstLine = trimmed.split(/\r?\n/)[0]?.trim();
+			if (!firstLine) {
+				return;
+			}
+
+			event.preventDefault();
+			void handleSubmit(firstLine);
+		};
+
+		document.addEventListener("paste", handlePaste);
+		return () => {
+			document.removeEventListener("paste", handlePaste);
+		};
+	}, [createBookmarkMutation.isPending, handleSubmit]);
 
 	const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
 		e.preventDefault();

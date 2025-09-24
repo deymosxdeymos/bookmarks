@@ -10,14 +10,17 @@ import {
 	getBookmark,
 	listBookmarks,
 	setBookmarkCategory,
+	updateBookmark,
 } from "@/lib/bookmarks-repo";
 import {
 	type BookmarkCreateInput,
 	type BookmarkFilterInput,
+	type BookmarkUpdateInput,
 	bookmarkCreateSchema,
 	bookmarkFilterInputSchema,
 	bookmarkFilterSchema,
 	bookmarkSchema,
+	bookmarkUpdateSchema,
 } from "@/lib/schemas";
 
 function bookmarkTag(userId: string, categoryId?: string | null) {
@@ -60,6 +63,21 @@ export async function deleteBookmarkAction(bookmarkId: string) {
 	if (bookmark?.categoryId) {
 		revalidateTag(bookmarkTag(session.user.id, bookmark.categoryId));
 	}
+}
+
+export async function updateBookmarkAction(
+	bookmarkId: string,
+	input: BookmarkUpdateInput,
+) {
+	const session = await requireSession();
+	const data = bookmarkUpdateSchema.parse(input);
+	const bookmark = await updateBookmark(session.user.id, bookmarkId, data);
+	if (!bookmark) {
+		return null;
+	}
+	revalidateTag(bookmarkTag(session.user.id, null));
+	revalidateTag(bookmarkTag(session.user.id, bookmark.categoryId));
+	return bookmarkSchema.parse(bookmark);
 }
 
 export async function setBookmarkCategoryAction(
