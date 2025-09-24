@@ -71,43 +71,33 @@
 	}
 }
 
-/* Section entrance animation */
-[data-animate="true"] {
-	opacity: 0;
-	transform: translateY(20px) translate3d(0, 0, 0);
-	filter: blur(8px);
-	animation: section-entrance 0.8s var(--ease-out-cubic) var(--delay, 0s)
-		forwards;
-	will-change: transform, opacity, filter;
+.orchestration > * {
+	animation: orchestration-enter 0.6s ease both;
+	animation-delay: calc(var(--delay) * var(--stagger));
+	--delay: 120ms;
 }
 
-@keyframes section-entrance {
+@keyframes orchestration-enter {
 	from {
 		opacity: 0;
-		transform: translateY(20px) translate3d(0, 0, 0);
-		filter: blur(8px);
+		transform: translateY(10px);
 	}
-
 	to {
 		opacity: 1;
-		transform: translateY(0) translate3d(0, 0, 0);
-		filter: blur(0px);
+		transform: translateY(0);
 	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-	[data-animate="true"] {
-		transform: none;
-		filter: none;
-		animation: section-entrance-reduced 0.8s var(--ease-out-cubic)
-			var(--delay, 0s) forwards;
+	.orchestration > * {
+		animation: orchestration-enter-reduced 0.6s ease both;
+		animation-delay: calc(var(--delay) * var(--stagger));
 	}
 
-	@keyframes section-entrance-reduced {
+	@keyframes orchestration-enter-reduced {
 		from {
 			opacity: 0;
 		}
-
 		to {
 			opacity: 1;
 		}
