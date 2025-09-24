@@ -745,10 +745,8 @@ export function BookmarksSection({
 												height={32}
 												width={32}
 												className={cn(
-													"absolute inset-0 size-full object-cover motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
-													showCopyFeedback
-														? "translate-y-full opacity-0"
-														: "translate-y-0 opacity-100",
+													"size-full object-cover motion-safe:[transition-property:opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quart)]",
+													showCopyFeedback ? "opacity-0" : "opacity-100",
 												)}
 												unoptimized
 												referrerPolicy="no-referrer"
@@ -756,7 +754,7 @@ export function BookmarksSection({
 											<span
 												aria-hidden
 												className={cn(
-													"absolute inset-0 flex items-center justify-center bg-background/95 text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													"absolute inset-0 flex items-center justify-center bg-background/95 text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quart)] motion-safe:will-change-transform",
 													showCopyFeedback
 														? "translate-y-0 opacity-100"
 														: "-translate-y-full opacity-0",
@@ -768,12 +766,9 @@ export function BookmarksSection({
 										<span className="relative flex min-h-[2.25rem] flex-col justify-center overflow-hidden">
 											<span
 												className={cn(
-													"flex flex-col gap-1 motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
-													showCopyFeedback
-														? "translate-y-full opacity-0"
-														: "translate-y-0 opacity-100",
+													"flex flex-col gap-1 motion-safe:[transition-property:opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quart)]",
+													showCopyFeedback ? "opacity-0" : "opacity-100",
 												)}
-												aria-hidden={showCopyFeedback}
 											>
 												<span className="truncate text-sm font-medium text-foreground">
 													{bookmark.title}
@@ -784,12 +779,11 @@ export function BookmarksSection({
 											</span>
 											<span
 												className={cn(
-													"absolute inset-0 flex items-center text-sm font-medium text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													"absolute inset-0 flex items-center text-sm font-medium text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quart)] motion-safe:will-change-transform",
 													showCopyFeedback
 														? "translate-y-0 opacity-100"
 														: "-translate-y-full opacity-0",
 												)}
-												style={{ transformOrigin: "top left" }}
 												aria-hidden={!showCopyFeedback}
 											>
 												Copied
@@ -797,14 +791,7 @@ export function BookmarksSection({
 										</span>
 									</a>
 								</div>
-								<div
-									className={cn(
-										"relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)]",
-										showCopyFeedback
-											? "-translate-y-1 opacity-0"
-											: "translate-y-0 opacity-100",
-									)}
-								>
+								<div className="relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right">
 									<time className="self-center text-xs text-muted-foreground tabular-nums transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-0 group-focus-within:opacity-0">
 										{formatCreatedAt(bookmark.createdAt)}
 									</time>
