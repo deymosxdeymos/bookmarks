@@ -651,12 +651,6 @@ export function BookmarksSection({
 
 				const listItemChildren = (
 					<>
-						{showCopyFeedback ? (
-							<div className="pointer-events-none absolute left-3 top-2 flex items-center gap-2 rounded-full bg-background/95 px-3 py-1 text-xs font-medium text-foreground shadow-sm motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200 motion-safe:ease-[var(--ease-out-quart)]">
-								<Check className="size-3" />
-								Copied
-							</div>
-						) : null}
 						{isEditing ? (
 							<form
 								className="flex w-full items-center justify-between gap-3"
@@ -723,45 +717,94 @@ export function BookmarksSection({
 								</div>
 							</form>
 						) : (
-							<>
-								<a
-									data-bookmark-link
-									data-bookmark-id={bookmark.id}
-									href={bookmark.url}
-									target="_blank"
-									rel="noreferrer"
-									onKeyDown={handleItemKeyDown}
-									onFocus={() => {
-										lastFocusedBookmarkIdRef.current = bookmark.id;
-									}}
-									onPointerDown={() => {
-										lastFocusedBookmarkIdRef.current = bookmark.id;
-									}}
-									onMouseEnter={() => {
-										lastFocusedBookmarkIdRef.current = bookmark.id;
-									}}
-									className="flex max-w-[75%] items-center gap-3 rounded-md outline-none focus-visible:bg-transparent focus:bg-transparent"
-									style={{ touchAction: "manipulation" }}
+							<div className="flex w-full items-center justify-between gap-3">
+								<div className="relative flex flex-1 items-center gap-3 overflow-hidden">
+									<a
+										data-bookmark-link
+										data-bookmark-id={bookmark.id}
+										href={bookmark.url}
+										target="_blank"
+										rel="noreferrer"
+										onKeyDown={handleItemKeyDown}
+										onFocus={() => {
+											lastFocusedBookmarkIdRef.current = bookmark.id;
+										}}
+										onPointerDown={() => {
+											lastFocusedBookmarkIdRef.current = bookmark.id;
+										}}
+										onMouseEnter={() => {
+											lastFocusedBookmarkIdRef.current = bookmark.id;
+										}}
+										className="flex max-w-[75%] items-center gap-3 rounded-md outline-none focus-visible:bg-transparent focus:bg-transparent"
+										style={{ touchAction: "manipulation" }}
+									>
+										<span className="relative size-8 shrink-0 overflow-hidden rounded-md border bg-muted">
+											<Image
+												src={bookmark.iconUrl ?? fallbackIcon(bookmark.domain)}
+												alt=""
+												height={32}
+												width={32}
+												className={cn(
+													"absolute inset-0 size-full object-cover motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													showCopyFeedback
+														? "translate-y-full opacity-0"
+														: "translate-y-0 opacity-100",
+												)}
+												unoptimized
+												referrerPolicy="no-referrer"
+											/>
+											<span
+												aria-hidden
+												className={cn(
+													"absolute inset-0 flex items-center justify-center bg-background/95 text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													showCopyFeedback
+														? "translate-y-0 opacity-100"
+														: "-translate-y-full opacity-0",
+												)}
+											>
+												<Check className="size-4" />
+											</span>
+										</span>
+										<span className="relative flex min-h-[2.25rem] flex-col justify-center overflow-hidden">
+											<span
+												className={cn(
+													"flex flex-col gap-1 motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													showCopyFeedback
+														? "translate-y-full opacity-0"
+														: "translate-y-0 opacity-100",
+												)}
+												aria-hidden={showCopyFeedback}
+											>
+												<span className="truncate text-sm font-medium text-foreground">
+													{bookmark.title}
+												</span>
+												<span className="truncate text-xs text-muted-foreground">
+													{bookmark.domain}
+												</span>
+											</span>
+											<span
+												className={cn(
+													"absolute inset-0 flex items-center text-sm font-medium text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													showCopyFeedback
+														? "translate-y-0 opacity-100"
+														: "-translate-y-full opacity-0",
+												)}
+												style={{ transformOrigin: "top left" }}
+												aria-hidden={!showCopyFeedback}
+											>
+												Copied
+											</span>
+										</span>
+									</a>
+								</div>
+								<div
+									className={cn(
+										"relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)]",
+										showCopyFeedback
+											? "-translate-y-1 opacity-0"
+											: "translate-y-0 opacity-100",
+									)}
 								>
-									<Image
-										src={bookmark.iconUrl ?? fallbackIcon(bookmark.domain)}
-										alt=""
-										height={32}
-										width={32}
-										className="size-8 rounded-md border bg-muted object-cover"
-										unoptimized
-										referrerPolicy="no-referrer"
-									/>
-									<div className="flex flex-col gap-1">
-										<span className="truncate text-sm font-medium text-foreground">
-											{bookmark.title}
-										</span>
-										<span className="truncate text-xs text-muted-foreground">
-											{bookmark.domain}
-										</span>
-									</div>
-								</a>
-								<div className="relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right">
 									<time className="self-center text-xs text-muted-foreground tabular-nums transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-0 group-focus-within:opacity-0">
 										{formatCreatedAt(bookmark.createdAt)}
 									</time>
@@ -777,7 +820,7 @@ export function BookmarksSection({
 										</span>
 									</div>
 								</div>
-							</>
+							</div>
 						)}
 					</>
 				);
