@@ -745,8 +745,10 @@ export function BookmarksSection({
 												height={32}
 												width={32}
 												className={cn(
-													"size-full object-cover motion-safe:[transition-property:opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quart)]",
-													showCopyFeedback ? "opacity-0" : "opacity-100",
+													"size-full object-cover motion-safe:transition-transform motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-in-out-quart)]",
+													showCopyFeedback
+														? "translate-y-full"
+														: "translate-y-0",
 												)}
 												unoptimized
 												referrerPolicy="no-referrer"
@@ -754,10 +756,10 @@ export function BookmarksSection({
 											<span
 												aria-hidden
 												className={cn(
-													"absolute inset-0 flex items-center justify-center bg-background/95 text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quart)] motion-safe:will-change-transform",
+													"absolute inset-0 flex items-center justify-center bg-background/95 text-foreground motion-safe:transition-transform motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-in-out-quart)]",
 													showCopyFeedback
-														? "translate-y-0 opacity-100"
-														: "-translate-y-full opacity-0",
+														? "translate-y-0"
+														: "-translate-y-full",
 												)}
 											>
 												<Check className="size-4" />
@@ -766,8 +768,10 @@ export function BookmarksSection({
 										<span className="relative flex min-h-[2.25rem] flex-col justify-center overflow-hidden">
 											<span
 												className={cn(
-													"flex flex-col gap-1 motion-safe:[transition-property:opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quart)]",
-													showCopyFeedback ? "opacity-0" : "opacity-100",
+													"flex flex-col gap-1 motion-safe:transition-transform motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-in-out-quart)]",
+													showCopyFeedback
+														? "translate-y-full"
+														: "translate-y-0",
 												)}
 											>
 												<span className="truncate text-sm font-medium text-foreground">
@@ -779,10 +783,10 @@ export function BookmarksSection({
 											</span>
 											<span
 												className={cn(
-													"absolute inset-0 flex items-center text-sm font-medium text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quart)] motion-safe:will-change-transform",
+													"absolute inset-0 flex items-center text-sm font-medium text-foreground motion-safe:transition-transform motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-in-out-quart)]",
 													showCopyFeedback
-														? "translate-y-0 opacity-100"
-														: "-translate-y-full opacity-0",
+														? "translate-y-0"
+														: "-translate-y-full",
 												)}
 												aria-hidden={!showCopyFeedback}
 											>
