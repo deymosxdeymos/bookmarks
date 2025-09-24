@@ -24,6 +24,12 @@ export const bookmarkCreateSchema = z.object({
 
 export type BookmarkCreateInput = z.infer<typeof bookmarkCreateSchema>;
 
+export const bookmarkUpdateSchema = z.object({
+	title: z.string().trim().min(1, "Title is required").max(256),
+});
+
+export type BookmarkUpdateInput = z.infer<typeof bookmarkUpdateSchema>;
+
 export const bookmarkFilterSchema = z.object({
 	userId: z.string().min(1),
 	categoryId: z.string().uuid().optional().nullable(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { ChevronsUpDown, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
@@ -52,15 +52,19 @@ export function UserMenu({ user }: { user: SessionUser }) {
 			<DropdownMenuTrigger asChild>
 				<Button
 					variant="ghost"
-					className="flex items-center gap-2 rounded-full px-2"
+					className="flex h-10 items-center gap-2 px-3 text-sm rounded-sm font-medium transition focus-visible:ring-2 focus-visible:ring-ring"
 					aria-label="Open user menu"
 				>
-					<span className="hidden text-sm font-medium sm:inline">
-						{user.name ?? user.email}
-					</span>
-					<span className="flex size-8 items-center justify-center rounded-full bg-muted text-sm font-semibold uppercase">
+					<span className="flex size-4 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase">
 						{initials}
 					</span>
+					<span className="hidden text-sm font-medium sm:inline truncate max-w-[8rem] sm:max-w-[12rem]">
+						{user.name ?? user.email}
+					</span>
+					<ChevronsUpDown
+						className="size-4 text-muted-foreground"
+						aria-hidden
+					/>
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-56">

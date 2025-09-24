@@ -1,0 +1,4 @@
+- [x] Wrap `handleSubmit` in `useCallback`
+- [x] Add guarded global `paste` listener that reuses `handleSubmit`
+- [x] Skip handler when mutation pending or target editable
+- [x] Run lint/check (or note if skipped)

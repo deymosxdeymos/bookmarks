@@ -1,36 +1,14 @@
 import type { Metadata } from "next";
-import { Geist_Mono } from "next/font/google";
-import localFont from "next/font/local";
+import { Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { LoadingBar } from "@/components/loading-bar";
 import { QueryProvider } from "@/components/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-const arial = localFont({
-	src: [
-		{
-			path: "../public/fonts/arial/arial.ttf",
-			weight: "400",
-			style: "normal",
-		},
-		{
-			path: "../public/fonts/arial/arial-bold.ttf",
-			weight: "700",
-			style: "normal",
-		},
-		{
-			path: "../public/fonts/arial/arial-italic.ttf",
-			weight: "400",
-			style: "italic",
-		},
-		{
-			path: "../public/fonts/arial/arial-bold-italic.ttf",
-			weight: "700",
-			style: "italic",
-		},
-	],
-	variable: "--font-arial",
+const inter = Inter({
+	variable: "--font-inter",
+	subsets: ["latin"],
 	display: "swap",
 });
 
@@ -58,7 +36,7 @@ export default function RootLayout({
 				/>
 			</head>
 			<body
-				className={`${arial.variable} ${geistMono.variable} h-full overflow-hidden antialiased`}
+				className={`${inter.variable} ${geistMono.variable} h-full overflow-hidden antialiased`}
 			>
 				<QueryProvider>
 					<ThemeProvider

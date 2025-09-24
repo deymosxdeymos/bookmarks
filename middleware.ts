@@ -1,21 +1,13 @@
+import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
 	const url = request.nextUrl;
 	const pathname = url.pathname;
 
 	try {
-		// Use same session validation as pages for consistency
-		const session = await auth.api.getSession({
-			headers: request.headers,
-		});
-		const isAuthenticated = Boolean(session);
-
-		// Add logging for debugging
-		console.log(
-			`[Middleware] ${pathname} - Auth: ${isAuthenticated}, Prod: ${process.env.NODE_ENV === "production"}`,
-		);
+		const sessionCookie = getSessionCookie(request);
+		const isAuthenticated = Boolean(sessionCookie);
 
 		const isPublicAuthRoute =
 			pathname === "/" ||
@@ -24,25 +16,15 @@ export async function middleware(request: NextRequest) {
 		const isProtectedRoute = pathname.startsWith("/dashboard");
 
 		if (isPublicAuthRoute && isAuthenticated) {
-			console.log(
-				`[Middleware] Redirecting authenticated user from ${pathname} to /dashboard`,
-			);
-			url.pathname = "/dashboard";
-			return NextResponse.redirect(url);
+			return NextResponse.redirect(new URL("/dashboard", request.url));
 		}
 
 		if (isProtectedRoute && !isAuthenticated) {
-			console.log(
-				`[Middleware] Redirecting unauthenticated user from ${pathname} to /login`,
-			);
-			url.pathname = "/login";
-			return NextResponse.redirect(url);
+			return NextResponse.redirect(new URL("/login", request.url));
 		}
 
 		return NextResponse.next();
-	} catch (error) {
-		console.error(`[Middleware] Session validation failed:`, error);
-		// Fail open - allow request to continue and let pages handle auth
+	} catch (_error) {
 		return NextResponse.next();
 	}
 }

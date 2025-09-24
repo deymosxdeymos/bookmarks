@@ -23,7 +23,7 @@ import type { Category } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
 const HOTKEY_SEQUENCE = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-const HOLD_DURATION_MS = 800;
+const HOLD_DURATION_MS = 1000;
 
 type CategoryComboboxProps = {
 	userId: string;
@@ -39,16 +39,38 @@ export function CategoryCombobox({
 	const [open, setOpen] = useState(false);
 	const [isCreating, setIsCreating] = useState(false);
 	const [createValue, setCreateValue] = useState("");
-	const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const holdProgressRef = useRef<HTMLDivElement>(null);
+	const [isHolding, setIsHolding] = useState(false);
+	const holdStartRef = useRef<number | null>(null);
 	const holdActiveRef = useRef(false);
-	const reducedMotionRef = useRef(false);
+	const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const createFormRef = useRef<HTMLFormElement>(null);
 	const createInputRef = useRef<HTMLInputElement>(null);
 	const createCategoryMutation = useCreateCategory(userId);
 	const deleteCategoryMutation = useDeleteCategory(userId);
+	const commandRef = useRef<HTMLDivElement>(null);
+
+	const focusCommandList = useCallback(() => {
+		const commandElement = commandRef.current;
+		if (!commandElement) return;
+
+		// Allow natural tab navigation within the command list
+		const selectedItem = commandElement.querySelector<HTMLElement>(
+			"[cmdk-item][aria-selected='true']",
+		);
+		const firstItem = commandElement.querySelector<HTMLElement>("[cmdk-item]");
+		const targetItem = selectedItem ?? firstItem;
+
+		if (targetItem) {
+			// Only focus if no other element within the command has focus
+			const activeElement = document.activeElement;
+			const isCommandFocused = commandElement.contains(activeElement);
+			if (!isCommandFocused) {
+				targetItem.focus({ preventScroll: true });
+			}
+		}
+	}, []);
 
 	const totalCount = useMemo(() => {
 		return categories.reduce(
@@ -93,20 +115,16 @@ export function CategoryCombobox({
 		[router, searchParams],
 	);
 
-	// Refs for stable keyboard handler
 	const optionHotkeysRef = useRef(optionHotkeys);
 	const applySelectionRef = useRef(applySelection);
 
 	const resetHoldState = useCallback(() => {
+		setIsHolding(false);
+		holdStartRef.current = null;
 		holdActiveRef.current = false;
 		if (holdTimeoutRef.current) {
 			clearTimeout(holdTimeoutRef.current);
 			holdTimeoutRef.current = null;
-		}
-		if (holdProgressRef.current) {
-			holdProgressRef.current.style.transition =
-				"width 120ms var(--ease-out-quart)";
-			holdProgressRef.current.style.width = "0%";
 		}
 	}, []);
 
@@ -124,37 +142,26 @@ export function CategoryCombobox({
 		}
 	}, [applySelection, current?.id, deleteCategoryMutation, resetHoldState]);
 
-	const startHold = useCallback(() => {
-		if (!current?.id || deleteCategoryMutation.isPending) return;
-		resetHoldState();
+	const beginHold = useCallback(() => {
+		if (
+			!current?.id ||
+			deleteCategoryMutation.isPending ||
+			holdActiveRef.current
+		)
+			return;
 		holdActiveRef.current = true;
-		const progressEl = holdProgressRef.current;
-		if (progressEl) {
-			progressEl.style.transition = reducedMotionRef.current
-				? "none"
-				: `width ${HOLD_DURATION_MS}ms var(--ease-out-quart)`;
-			requestAnimationFrame(() => {
-				progressEl.style.width = "100%";
-			});
-		}
-		holdTimeoutRef.current = setTimeout(async () => {
-			holdTimeoutRef.current = null;
-			holdActiveRef.current = false;
-			await handleDelete();
+		holdStartRef.current = performance.now();
+		setIsHolding(true);
+		holdTimeoutRef.current = setTimeout(() => {
+			if (!holdActiveRef.current) return;
+			handleDelete();
 		}, HOLD_DURATION_MS);
-	}, [
-		current?.id,
-		deleteCategoryMutation.isPending,
-		handleDelete,
-		resetHoldState,
-	]);
+	}, [current?.id, deleteCategoryMutation.isPending, handleDelete]);
 
 	const cancelHold = useCallback(() => {
-		if (!holdActiveRef.current) return;
 		resetHoldState();
 	}, [resetHoldState]);
 
-	// Store latest values in refs to avoid recreating keyboard handler
 	useEffect(() => {
 		optionHotkeysRef.current = optionHotkeys;
 		applySelectionRef.current = applySelection;
@@ -171,56 +178,13 @@ export function CategoryCombobox({
 			setIsCreating(false);
 			setCreateValue("");
 			resetHoldState();
-		}
-	}, [open, resetHoldState]);
-
-	useEffect(() => {
-		const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-		const update = () => {
-			reducedMotionRef.current = media.matches;
-		};
-		update();
-		media.addEventListener("change", update);
-		return () => media.removeEventListener("change", update);
-	}, []);
-
-	// Create stable keyboard handler that uses refs to access latest values
-	const globalHotkeyHandler = useCallback((event: KeyboardEvent) => {
-		if (event.defaultPrevented || event.isComposing) return;
-		if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
 			return;
 		}
-
-		const target = event.target;
-		if (target instanceof HTMLElement) {
-			if (target.isContentEditable) return;
-			const tagName = target.tagName;
-			if (
-				tagName === "INPUT" ||
-				tagName === "TEXTAREA" ||
-				tagName === "SELECT"
-			) {
-				return;
-			}
-		}
-
-		const pressed = event.key;
-		const binding = optionHotkeysRef.current.find(
-			(entry) => entry.hotkey === pressed,
-		);
-		if (!binding || binding.hotkey == null) {
-			return;
-		}
-
-		event.preventDefault();
-		applySelectionRef.current(binding.categoryId);
-		setOpen(false);
-	}, []);
-
-	useEffect(() => {
-		document.addEventListener("keydown", globalHotkeyHandler);
-		return () => document.removeEventListener("keydown", globalHotkeyHandler);
-	}, [globalHotkeyHandler]);
+		const frame = requestAnimationFrame(() => {
+			focusCommandList();
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [open, focusCommandList, resetHoldState]);
 
 	const handleCreateSubmit: React.FormEventHandler<HTMLFormElement> = async (
 		event,
@@ -244,19 +208,23 @@ export function CategoryCombobox({
 	const handleCreateInputKeyDown: React.KeyboardEventHandler<
 		HTMLInputElement
 	> = (event) => {
-		if (event.key !== "Enter") {
-			return;
+		if (event.key === "Enter") {
+			event.preventDefault();
+			event.stopPropagation();
+			if (createCategoryMutation.isPending) {
+				return;
+			}
+			const form = createFormRef.current;
+			if (!form) {
+				return;
+			}
+			form.requestSubmit();
+		} else if (event.key === "Escape") {
+			event.preventDefault();
+			event.stopPropagation();
+			setIsCreating(false);
+			setCreateValue("");
 		}
-		event.preventDefault();
-		event.stopPropagation();
-		if (createCategoryMutation.isPending) {
-			return;
-		}
-		const form = createFormRef.current;
-		if (!form) {
-			return;
-		}
-		form.requestSubmit();
 	};
 
 	return (
@@ -264,7 +232,7 @@ export function CategoryCombobox({
 			<PopoverTrigger asChild>
 				<Button
 					variant="ghost"
-					className="flex h-10 items-center gap-2 bg-card px-3 text-sm rounded-sm font-medium transition focus-visible:ring-2 focus-visible:ring-ring"
+					className="flex h-10 items-center gap-2 px-3 text-sm rounded-sm font-medium transition focus-visible:ring-2 focus-visible:ring-ring"
 					role="combobox"
 					aria-expanded={open}
 					aria-label="Select category"
@@ -283,7 +251,16 @@ export function CategoryCombobox({
 				align="start"
 				className="w-64 rounded-xl border border-border/70 bg-popover/95 p-1 shadow-xl motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)]"
 			>
-				<Command className="border-none bg-transparent shadow-none">
+				<Command
+					ref={commandRef}
+					className="border-none bg-transparent shadow-none"
+					onKeyDown={(e) => {
+						// Allow tab navigation to work naturally
+						if (e.key === "Tab") {
+							return;
+						}
+					}}
+				>
 					<CommandList className="max-h-[320px] overflow-y-auto px-1 py-1">
 						{options.map((categoryOption, index) => {
 							const isSelected =
@@ -294,12 +271,13 @@ export function CategoryCombobox({
 								<CommandItem
 									key={categoryOption.id ?? "__all"}
 									value={categoryOption.id ?? "all"}
+									tabIndex={0}
 									onSelect={(value) => {
 										const nextId = value === "all" ? null : value;
 										applySelection(nextId);
 										setOpen(false);
 									}}
-									className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors aria-selected:bg-accent aria-selected:text-foreground"
+									className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors aria-selected:bg-accent aria-selected:text-foreground focus:bg-accent focus:outline-none"
 								>
 									<ColorSwatch
 										color={categoryOption.color}
@@ -336,38 +314,32 @@ export function CategoryCombobox({
 									className="h-8 flex-1 border-none bg-transparent px-0 text-sm focus-visible:ring-0"
 									autoComplete="off"
 									spellCheck={false}
+									disabled={createCategoryMutation.isPending}
 								/>
-								<div className="flex items-center gap-2 text-xs font-medium">
-									<button
-										type="button"
-										onClick={() => {
-											setIsCreating(false);
-											setCreateValue("");
-										}}
-										className="text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-									>
-										Cancel
-									</button>
-									<button
-										type="submit"
-										disabled={createCategoryMutation.isPending}
-										className="flex items-center gap-1 text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-70"
-									>
-										{createCategoryMutation.isPending ? (
-											<Loader2 className="size-3 animate-spin" aria-hidden />
-										) : null}
-										Add
-									</button>
-								</div>
+								{createCategoryMutation.isPending && (
+									<Loader2
+										className="size-4 animate-spin text-muted-foreground"
+										aria-hidden
+									/>
+								)}
 							</form>
 						) : (
 							<CommandItem
 								value="__new"
+								tabIndex={0}
 								onSelect={() => {
 									setIsCreating(true);
 									setCreateValue("");
 								}}
-								className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
+								onKeyDown={(event) => {
+									if (event.key === "Enter" || event.key === " ") {
+										event.preventDefault();
+										event.stopPropagation();
+										setIsCreating(true);
+										setCreateValue("");
+									}
+								}}
+								className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
 							>
 								<Plus className="size-4" aria-hidden />
 								<span>New Group</span>
@@ -376,14 +348,21 @@ export function CategoryCombobox({
 						{current.id ? (
 							<CommandItem
 								value="__delete"
-								onSelect={() => {}}
+								tabIndex={0}
+								onSelect={(value) => {
+									if (value === "__delete") {
+										return;
+									}
+								}}
 								onPointerDown={(event) => {
 									if (event.button !== 0) return;
 									event.preventDefault();
-									startHold();
+									event.stopPropagation();
+									beginHold();
 								}}
 								onPointerUp={(event) => {
 									event.preventDefault();
+									event.stopPropagation();
 									cancelHold();
 								}}
 								onPointerLeave={() => cancelHold()}
@@ -391,30 +370,45 @@ export function CategoryCombobox({
 								onKeyDown={(event) => {
 									if (event.key === " " || event.key === "Enter") {
 										event.preventDefault();
-										if (!holdActiveRef.current) startHold();
+										event.stopPropagation();
+										beginHold();
 									}
 								}}
 								onKeyUp={(event) => {
 									if (event.key === " " || event.key === "Enter") {
 										event.preventDefault();
+										event.stopPropagation();
 										cancelHold();
 									}
 								}}
-								className="group relative mt-1 flex items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus:bg-destructive/10"
+								data-holding={isHolding ? "true" : undefined}
+								aria-disabled={deleteCategoryMutation.isPending}
+								className={cn(
+									"group mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus-visible:bg-muted focus-visible:outline-none active:scale-[0.98] touch-manipulation holdable",
+								)}
+								style={
+									{
+										"--hold-duration": `${HOLD_DURATION_MS}ms`,
+									} as React.CSSProperties
+								}
 							>
-								<div
-									ref={holdProgressRef}
-									className="pointer-events-none absolute inset-0 w-0 rounded-lg bg-destructive/20"
-								/>
-								<Trash2 className="size-4" aria-hidden />
-								<span className="relative z-10 text-sm font-medium">
-									<span className="block transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0 group-active:opacity-0">
+								<div className="holdable-label flex items-center gap-3 h-full text-muted-foreground group-hover:hidden group-focus-visible:hidden">
+									<Trash2 className="size-4" aria-hidden />
+									<span>Delete Group</span>
+								</div>
+								<div className="holdable-hint hidden items-center gap-3 h-full text-muted-foreground group-hover:flex group-focus-visible:flex">
+									<Trash2 className="size-4" aria-hidden />
+									<span>Hold to Confirm</span>
+								</div>
+								<div className="holdable-overlay" aria-hidden>
+									<Trash2 className="size-4" aria-hidden />
+									<span className="holdable-overlay-text holdable-overlay-label">
 										Delete Group
 									</span>
-									<span className="absolute inset-0 block text-destructive opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-										Hold to confirm
+									<span className="holdable-overlay-text holdable-overlay-hint">
+										Hold to Confirm
 									</span>
-								</span>
+								</div>
 							</CommandItem>
 						) : null}
 					</CommandList>

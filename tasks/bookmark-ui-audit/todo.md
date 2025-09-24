@@ -1,0 +1,5 @@
+- [x] Simplify copy feedback without list blur
+- [x] Implement inline rename with focus restoration
+- [x] Update state/accessibility to respect inline editing
+- [x] Polish shortcut labels & remove obsolete dialog
+- [x] Run verification (lint/type) or note if skipped
