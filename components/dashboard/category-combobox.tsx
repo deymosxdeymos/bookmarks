@@ -384,7 +384,7 @@ export function CategoryCombobox({
 								data-holding={isHolding ? "true" : undefined}
 								aria-disabled={deleteCategoryMutation.isPending}
 								className={cn(
-									"group mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 focus:outline-none active:scale-[0.98] touch-manipulation holdable",
+									"group mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus-visible:bg-muted focus-visible:outline-none active:scale-[0.98] touch-manipulation holdable",
 								)}
 								style={
 									{
@@ -392,11 +392,11 @@ export function CategoryCombobox({
 									} as React.CSSProperties
 								}
 							>
-								<div className="holdable-label flex items-center gap-3 h-full text-muted-foreground group-hover:hidden">
+								<div className="holdable-label flex items-center gap-3 h-full text-muted-foreground group-hover:hidden group-focus-visible:hidden">
 									<Trash2 className="size-4" aria-hidden />
 									<span>Delete Group</span>
 								</div>
-								<div className="holdable-hint hidden items-center gap-3 h-full text-muted-foreground group-hover:flex">
+								<div className="holdable-hint hidden items-center gap-3 h-full text-muted-foreground group-hover:flex group-focus-visible:flex">
 									<Trash2 className="size-4" aria-hidden />
 									<span>Hold to Confirm</span>
 								</div>
