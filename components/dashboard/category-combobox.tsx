@@ -49,6 +49,28 @@ export function CategoryCombobox({
 	const createInputRef = useRef<HTMLInputElement>(null);
 	const createCategoryMutation = useCreateCategory(userId);
 	const deleteCategoryMutation = useDeleteCategory(userId);
+	const commandRef = useRef<HTMLDivElement>(null);
+
+	const focusCommandList = useCallback(() => {
+		const commandElement = commandRef.current;
+		if (!commandElement) return;
+
+		// Allow natural tab navigation within the command list
+		const selectedItem = commandElement.querySelector<HTMLElement>(
+			"[cmdk-item][aria-selected='true']",
+		);
+		const firstItem = commandElement.querySelector<HTMLElement>("[cmdk-item]");
+		const targetItem = selectedItem ?? firstItem;
+
+		if (targetItem) {
+			// Only focus if no other element within the command has focus
+			const activeElement = document.activeElement;
+			const isCommandFocused = commandElement.contains(activeElement);
+			if (!isCommandFocused) {
+				targetItem.focus({ preventScroll: true });
+			}
+		}
+	}, []);
 
 	const totalCount = useMemo(() => {
 		return categories.reduce(
@@ -156,8 +178,13 @@ export function CategoryCombobox({
 			setIsCreating(false);
 			setCreateValue("");
 			resetHoldState();
+			return;
 		}
-	}, [open, resetHoldState]);
+		const frame = requestAnimationFrame(() => {
+			focusCommandList();
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [open, focusCommandList, resetHoldState]);
 
 	const handleCreateSubmit: React.FormEventHandler<HTMLFormElement> = async (
 		event,
@@ -224,7 +251,16 @@ export function CategoryCombobox({
 				align="start"
 				className="w-64 rounded-xl border border-border/70 bg-popover/95 p-1 shadow-xl motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)]"
 			>
-				<Command className="border-none bg-transparent shadow-none">
+				<Command
+					ref={commandRef}
+					className="border-none bg-transparent shadow-none"
+					onKeyDown={(e) => {
+						// Allow tab navigation to work naturally
+						if (e.key === "Tab") {
+							return;
+						}
+					}}
+				>
 					<CommandList className="max-h-[320px] overflow-y-auto px-1 py-1">
 						{options.map((categoryOption, index) => {
 							const isSelected =
@@ -235,12 +271,13 @@ export function CategoryCombobox({
 								<CommandItem
 									key={categoryOption.id ?? "__all"}
 									value={categoryOption.id ?? "all"}
+									tabIndex={0}
 									onSelect={(value) => {
 										const nextId = value === "all" ? null : value;
 										applySelection(nextId);
 										setOpen(false);
 									}}
-									className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors aria-selected:bg-accent aria-selected:text-foreground"
+									className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors aria-selected:bg-accent aria-selected:text-foreground focus:bg-accent focus:outline-none"
 								>
 									<ColorSwatch
 										color={categoryOption.color}
@@ -289,11 +326,20 @@ export function CategoryCombobox({
 						) : (
 							<CommandItem
 								value="__new"
+								tabIndex={0}
 								onSelect={() => {
 									setIsCreating(true);
 									setCreateValue("");
 								}}
-								className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
+								onKeyDown={(event) => {
+									if (event.key === "Enter" || event.key === " ") {
+										event.preventDefault();
+										event.stopPropagation();
+										setIsCreating(true);
+										setCreateValue("");
+									}
+								}}
+								className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
 							>
 								<Plus className="size-4" aria-hidden />
 								<span>New Group</span>
@@ -302,6 +348,7 @@ export function CategoryCombobox({
 						{current.id ? (
 							<CommandItem
 								value="__delete"
+								tabIndex={0}
 								onSelect={(value) => {
 									if (value === "__delete") {
 										return;
@@ -337,11 +384,13 @@ export function CategoryCombobox({
 								data-holding={isHolding ? "true" : undefined}
 								aria-disabled={deleteCategoryMutation.isPending}
 								className={cn(
-									"group mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] touch-manipulation holdable",
+									"group mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 focus:outline-none active:scale-[0.98] touch-manipulation holdable",
 								)}
-								style={{
-									["--hold-duration" as const]: `${HOLD_DURATION_MS}ms`,
-								}}
+								style={
+									{
+										"--hold-duration": `${HOLD_DURATION_MS}ms`,
+									} as React.CSSProperties
+								}
 							>
 								<div className="holdable-label flex items-center gap-3 h-full text-muted-foreground group-hover:hidden">
 									<Trash2 className="size-4" aria-hidden />

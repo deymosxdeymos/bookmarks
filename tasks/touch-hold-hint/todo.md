@@ -5,3 +5,5 @@
 - [x] Run `bun run lint`.
 - [x] Drop active-state text swap so hold keeps "Delete Group" visible while the overlay progresses.
 - [x] Ensure touch hold overlay text shows "Delete Group" while desktop retains "Hold to Confirm".
+- [x] Smooth first-hold progress by syncing CSS hold duration with JS timeout.
+- [x] Keep destructive background neutral until the hold actually fires.
