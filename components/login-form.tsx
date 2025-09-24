@@ -1,13 +1,16 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 import { Asterisk } from "@/components/ui/asterisk";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { type LoginInput, loginSchema } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
 export function LoginForm({
@@ -19,23 +22,29 @@ export function LoginForm({
 	const emailErrorId = `${emailId}-error`;
 	const passwordErrorId = `${passwordId}-error`;
 	const authErrorId = useId();
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
+
 	const [showPassword, setShowPassword] = useState(false);
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState("");
-	const [fieldErrors, setFieldErrors] = useState<{
-		email?: string;
-		password?: string;
-	}>({});
 	const emailRef = useRef<HTMLInputElement>(null);
 	const passwordRef = useRef<HTMLInputElement>(null);
 	const errorRef = useRef<HTMLParagraphElement>(null);
 	const router = useRouter();
-	const isDirty = email.length > 0 || password.length > 0;
+
+	const {
+		register,
+		handleSubmit,
+		setError,
+		formState: { errors, isSubmitting, isDirty },
+	} = useForm<LoginInput>({
+		resolver: zodResolver(loginSchema),
+		defaultValues: {
+			email: "",
+			password: "",
+		},
+	});
+
 	const passwordDescribedBy = [
-		fieldErrors.password ? passwordErrorId : undefined,
-		error ? authErrorId : undefined,
+		errors.password ? passwordErrorId : undefined,
+		errors.root ? authErrorId : undefined,
 	]
 		.filter(Boolean)
 		.join(" ");
@@ -44,7 +53,7 @@ export function LoginForm({
 
 	useEffect(() => {
 		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-			if (!isDirty || isLoading) {
+			if (!isDirty || isSubmitting) {
 				return;
 			}
 			event.preventDefault();
@@ -56,55 +65,13 @@ export function LoginForm({
 		return () => {
 			window.removeEventListener("beforeunload", handleBeforeUnload);
 		};
-	}, [isDirty, isLoading]);
+	}, [isDirty, isSubmitting]);
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		setError("");
-
-		if (isLoading) {
-			return;
-		}
-
-		const trimmedEmail = email.trim();
-		const sanitizedPassword = password.replace(/\s+$/, "");
-		const nextFieldErrors: { email?: string; password?: string } = {};
-
-		if (!trimmedEmail) {
-			nextFieldErrors.email = "Enter your email address.";
-		} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-			nextFieldErrors.email = "Enter a valid email address.";
-		}
-
-		if (!sanitizedPassword) {
-			nextFieldErrors.password = "Enter your password.";
-		}
-
-		if (Object.keys(nextFieldErrors).length > 0) {
-			setFieldErrors(nextFieldErrors);
-
-			const [firstField] = Object.keys(nextFieldErrors);
-			requestAnimationFrame(() => {
-				if (firstField === "email") {
-					emailRef.current?.focus();
-					return;
-				}
-				if (firstField === "password") {
-					passwordRef.current?.focus();
-				}
-			});
-			return;
-		}
-
-		setFieldErrors({});
-		setEmail(trimmedEmail);
-		setPassword(sanitizedPassword);
-		setIsLoading(true);
-
+	const onSubmit = async (data: LoginInput) => {
 		try {
 			const { error: signInError } = await authClient.signIn.email({
-				email: trimmedEmail,
-				password: sanitizedPassword,
+				email: data.email,
+				password: data.password,
 			});
 
 			if (signInError) {
@@ -138,7 +105,9 @@ export function LoginForm({
 						? "Invalid email or password."
 						: "Unable to log in right now. Try again in a moment.";
 
-				setError(serverMessage ?? fallbackMessage);
+				setError("root", {
+					message: serverMessage ?? fallbackMessage,
+				});
 				requestAnimationFrame(() => {
 					errorRef.current?.focus();
 				});
@@ -151,14 +120,15 @@ export function LoginForm({
 				unknownError instanceof Error && unknownError.message
 					? unknownError.message
 					: "Unable to log in right now. Try again in a moment.";
-			setError(message);
+			setError("root", { message });
 			requestAnimationFrame(() => {
 				errorRef.current?.focus();
 			});
-		} finally {
-			setIsLoading(false);
 		}
 	};
+
+	const emailRegistration = register("email");
+	const passwordRegistration = register("password");
 
 	return (
 		<div
@@ -178,63 +148,50 @@ export function LoginForm({
 						<h1 className="font-semibold text-lg">Welcome</h1>
 						<Asterisk />
 					</div>
-					<form onSubmit={handleSubmit} className="space-y-6" noValidate>
+					<form
+						onSubmit={handleSubmit(onSubmit)}
+						className="space-y-6"
+						noValidate
+					>
 						<div className="space-y-2">
 							<Input
-								ref={emailRef}
+								{...emailRegistration}
+								ref={(e) => {
+									emailRegistration.ref(e);
+									emailRef.current = e;
+								}}
 								id={emailId}
 								type="email"
 								placeholder="Enter your email…"
-								value={email}
-								onChange={(event) => {
-									setEmail(event.target.value);
-									if (fieldErrors.email) {
-										setFieldErrors((prev) => ({ ...prev, email: undefined }));
-									}
-									if (error) {
-										setError("");
-									}
-								}}
 								autoComplete="email"
-								name="email"
 								spellCheck={false}
-								aria-invalid={Boolean(fieldErrors.email)}
-								aria-describedby={fieldErrors.email ? emailErrorId : undefined}
+								aria-invalid={Boolean(errors.email)}
+								aria-describedby={errors.email ? emailErrorId : undefined}
 								className="w-full bg-muted text-base"
 							/>
-							{fieldErrors.email && (
+							{errors.email && (
 								<p
 									id={emailErrorId}
 									className="text-sm font-medium text-destructive"
 									aria-live="polite"
 								>
-									{fieldErrors.email}
+									{errors.email.message}
 								</p>
 							)}
 						</div>
 						<div className="space-y-2">
 							<div className="relative">
 								<Input
-									ref={passwordRef}
+									{...passwordRegistration}
+									ref={(e) => {
+										passwordRegistration.ref(e);
+										passwordRef.current = e;
+									}}
 									id={passwordId}
 									type={showPassword ? "text" : "password"}
 									placeholder="Enter your password…"
-									value={password}
-									onChange={(event) => {
-										setPassword(event.target.value);
-										if (fieldErrors.password) {
-											setFieldErrors((prev) => ({
-												...prev,
-												password: undefined,
-											}));
-										}
-										if (error) {
-											setError("");
-										}
-									}}
 									autoComplete="current-password"
-									name="password"
-									aria-invalid={Boolean(fieldErrors.password)}
+									aria-invalid={Boolean(errors.password)}
 									aria-describedby={passwordDescribedByAttr}
 									className="w-full bg-muted pr-10 text-base"
 								/>
@@ -252,16 +209,16 @@ export function LoginForm({
 									)}
 								</button>
 							</div>
-							{fieldErrors.password && (
+							{errors.password && (
 								<p
 									id={passwordErrorId}
 									className="text-sm font-medium text-destructive"
 									aria-live="polite"
 								>
-									{fieldErrors.password}
+									{errors.password.message}
 								</p>
 							)}
-							{error && (
+							{errors.root && (
 								<p
 									ref={errorRef}
 									id={authErrorId}
@@ -270,7 +227,7 @@ export function LoginForm({
 									aria-live="polite"
 									tabIndex={-1}
 								>
-									{error}
+									{errors.root.message}
 								</p>
 							)}
 						</div>
@@ -284,10 +241,10 @@ export function LoginForm({
 							<Button
 								size="sm"
 								type="submit"
-								disabled={isLoading}
+								disabled={isSubmitting}
 								className="px-4 py-3 text-sm font-bold"
 							>
-								{isLoading && (
+								{isSubmitting && (
 									<Loader2
 										className="mr-2 h-4 w-4 animate-spin"
 										aria-hidden="true"
