@@ -212,6 +212,8 @@
 	.holdable {
 		position: relative;
 		overflow: hidden;
+		--hold-progress-duration: 200ms;
+		--hold-progress-timing: ease-out;
 	}
 
 	.holdable::before {
@@ -221,13 +223,10 @@
 		border-radius: inherit;
 		background-color: var(--destructive-soft-bg, #ffdbdc);
 		clip-path: inset(0 100% 0 0);
-		transition: clip-path var(--hold-duration, 0.5s) linear;
+		transition: clip-path var(--hold-progress-duration)
+			var(--hold-progress-timing);
+		will-change: clip-path;
 		z-index: 0;
-	}
-
-	.holdable[data-holding="true"]::before,
-	.holdable:active::before {
-		clip-path: inset(0 0 0 0);
 	}
 
 	.holdable-overlay {
@@ -240,13 +239,45 @@
 		border-radius: inherit;
 		color: var(--destructive-soft-fg, #e5484d);
 		clip-path: inset(0 100% 0 0);
-		transition: clip-path var(--hold-duration, 0.5s) linear;
+		transition: clip-path var(--hold-progress-duration)
+			var(--hold-progress-timing);
 		pointer-events: none;
+		will-change: clip-path;
 		z-index: 1;
 	}
 
-	.holdable[data-holding="true"] .holdable-overlay,
-	.holdable:active .holdable-overlay {
+	.holdable[data-holding="true"] {
+		--hold-progress-duration: var(--hold-duration, 0.5s);
+		--hold-progress-timing: linear;
+	}
+
+	.holdable[data-holding="true"]::before {
 		clip-path: inset(0 0 0 0);
+	}
+
+	.holdable[data-holding="true"] .holdable-overlay {
+		clip-path: inset(0 0 0 0);
+	}
+
+	.holdable-overlay-label {
+		display: none;
+	}
+
+	@media (hover: none) {
+		.holdable .holdable-label {
+			display: flex !important;
+		}
+
+		.holdable .holdable-hint {
+			display: none !important;
+		}
+
+		.holdable .holdable-overlay-label {
+			display: inline;
+		}
+
+		.holdable .holdable-overlay-hint {
+			display: none;
+		}
 	}
 }

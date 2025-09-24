@@ -337,20 +337,28 @@ export function CategoryCombobox({
 								data-holding={isHolding ? "true" : undefined}
 								aria-disabled={deleteCategoryMutation.isPending}
 								className={cn(
-									"group mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] active:bg-destructive/15 touch-manipulation holdable",
+									"group mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-100 hover:bg-destructive/10 focus:bg-destructive/10 active:scale-[0.98] touch-manipulation holdable",
 								)}
+								style={{
+									["--hold-duration" as const]: `${HOLD_DURATION_MS}ms`,
+								}}
 							>
-								<div className="flex items-center gap-3 h-full text-muted-foreground group-hover:hidden group-active:hidden">
+								<div className="holdable-label flex items-center gap-3 h-full text-muted-foreground group-hover:hidden">
 									<Trash2 className="size-4" aria-hidden />
 									<span>Delete Group</span>
 								</div>
-								<div className="hidden items-center gap-3 h-full text-muted-foreground group-hover:flex group-active:flex">
+								<div className="holdable-hint hidden items-center gap-3 h-full text-muted-foreground group-hover:flex">
 									<Trash2 className="size-4" aria-hidden />
 									<span>Hold to Confirm</span>
 								</div>
 								<div className="holdable-overlay" aria-hidden>
 									<Trash2 className="size-4" aria-hidden />
-									<span>Hold to Confirm</span>
+									<span className="holdable-overlay-text holdable-overlay-label">
+										Delete Group
+									</span>
+									<span className="holdable-overlay-text holdable-overlay-hint">
+										Hold to Confirm
+									</span>
 								</div>
 							</CommandItem>
 						) : null}
