@@ -14,8 +14,6 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { BookmarkContextMenu } from "@/components/dashboard/bookmark-context-menu";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import type { ListResult } from "@/lib/bookmarks-repo";
 import { fallbackIcon } from "@/lib/metadata";
 import {
@@ -57,6 +55,8 @@ export function BookmarksSection({
 	const [activeEditId, setActiveEditId] = useState<string | null>(null);
 	const [editDraft, setEditDraft] = useState("");
 	const [pendingEditId, setPendingEditId] = useState<string | null>(null);
+	const [isInitialEdit, setIsInitialEdit] = useState(false);
+	const editDraftRef = useRef("");
 	const [feedback, setFeedback] = useState<{
 		id: string;
 		type: "copied" | "renamed";
@@ -171,17 +171,23 @@ export function BookmarksSection({
 		lastFocusedBookmarkIdRef.current = bookmark.id;
 		setActiveEditId(bookmark.id);
 		setEditDraft(bookmark.title);
+		editDraftRef.current = bookmark.title;
+		setIsInitialEdit(true);
 	}, []);
 
 	const cancelInlineRename = useCallback(() => {
 		setActiveEditId(null);
 		setEditDraft("");
+		editDraftRef.current = "";
 		setPendingEditId(null);
+		setIsInitialEdit(false);
 	}, []);
 
 	const commitInlineRename = useCallback(async () => {
 		if (!activeEditId) return;
-		const trimmed = editDraft.trim();
+		const currentValue =
+			inlineEditInputRef.current?.value || editDraftRef.current;
+		const trimmed = currentValue.trim();
 		if (!trimmed) {
 			toast.error("Title cannot be empty.");
 			return;
@@ -196,6 +202,7 @@ export function BookmarksSection({
 			toast.success("Updated title");
 			setActiveEditId(null);
 			setEditDraft("");
+			setIsInitialEdit(false);
 			lastFocusedBookmarkIdRef.current = activeEditId;
 		} catch (error) {
 			console.error("rename bookmark failed", error);
@@ -203,7 +210,7 @@ export function BookmarksSection({
 		} finally {
 			setPendingEditId(null);
 		}
-	}, [activeEditId, editDraft, triggerFeedback, updateBookmarkMutation]);
+	}, [activeEditId, triggerFeedback, updateBookmarkMutation]);
 
 	const handleInlineEditSubmit = useCallback(
 		(event: FormEvent<HTMLFormElement>) => {
@@ -641,8 +648,6 @@ export function BookmarksSection({
 				const listItemClassName = cn(
 					"group relative flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-[var(--ease-out-quart)]",
 					!isEditing && "hover:bg-accent focus-within:bg-accent",
-					(isEditing || showRenameFeedback) &&
-						"bg-amber-100 text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300",
 					showRenameFeedback &&
 						!isEditing &&
 						"motion-safe:animate-in motion-safe:fade-in-0",
@@ -673,47 +678,48 @@ export function BookmarksSection({
 										referrerPolicy="no-referrer"
 									/>
 									<div className="flex flex-1 flex-col gap-1">
-										<Input
-											ref={inlineEditInputRef}
-											value={editDraft}
-											onChange={(event) => setEditDraft(event.target.value)}
-											onFocus={() => {
-												lastFocusedBookmarkIdRef.current = bookmark.id;
-											}}
-											onKeyDown={(event) => {
-												if (event.key === "Escape") {
-													event.preventDefault();
-													cancelInlineRename();
-												}
-											}}
-											aria-label={`Edit title for ${bookmark.domain}`}
-											disabled={pendingEditId === bookmark.id}
-											maxLength={256}
-											className="h-8 w-full text-sm"
-										/>
+										<div className="relative">
+											{isInitialEdit && (
+												<span
+													className="absolute left-0 top-0 z-0 rounded-sm bg-yellow-200 px-1 text-sm font-medium opacity-100 pointer-events-none"
+													aria-hidden="true"
+												>
+													{editDraftRef.current}
+												</span>
+											)}
+											<input
+												ref={inlineEditInputRef}
+												defaultValue={editDraft}
+												onChange={(event) => {
+													editDraftRef.current = event.target.value;
+													if (isInitialEdit) {
+														setIsInitialEdit(false);
+													}
+												}}
+												onFocus={() => {
+													lastFocusedBookmarkIdRef.current = bookmark.id;
+												}}
+												onKeyDown={(event) => {
+													if (event.key === "Escape") {
+														event.preventDefault();
+														cancelInlineRename();
+													}
+												}}
+												aria-label={`Edit title for ${bookmark.domain}`}
+												disabled={pendingEditId === bookmark.id}
+												maxLength={100}
+												className={cn(
+													"relative z-10 h-auto w-full min-w-0 border-none bg-transparent text-sm font-medium outline-none [&::selection]:bg-transparent [&::-moz-selection]:bg-transparent",
+													isInitialEdit
+														? "text-transparent caret-black"
+														: "text-foreground",
+												)}
+											/>
+										</div>
 										<span className="truncate text-xs text-muted-foreground">
 											{bookmark.domain}
 										</span>
 									</div>
-								</div>
-								<div className="flex items-center gap-2">
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onClick={cancelInlineRename}
-										disabled={pendingEditId === bookmark.id}
-									>
-										Cancel
-									</Button>
-									<Button
-										type="submit"
-										size="sm"
-										disabled={pendingEditId === bookmark.id}
-										className="bg-foreground text-background hover:bg-foreground/90"
-									>
-										{pendingEditId === bookmark.id ? "Saving…" : "Save"}
-									</Button>
 								</div>
 							</form>
 						) : (
@@ -735,7 +741,10 @@ export function BookmarksSection({
 										onMouseEnter={() => {
 											lastFocusedBookmarkIdRef.current = bookmark.id;
 										}}
-										className="flex max-w-[75%] items-center gap-3 rounded-md outline-none focus-visible:bg-transparent focus:bg-transparent"
+										className={cn(
+											"flex max-w-[75%] items-center gap-3 rounded-md outline-none focus-visible:bg-transparent focus:bg-transparent",
+											isEditing && "pointer-events-none opacity-0",
+										)}
 										style={{ touchAction: "manipulation" }}
 									>
 										<span className="relative size-8 shrink-0 overflow-hidden rounded-md border bg-muted">
@@ -795,7 +804,12 @@ export function BookmarksSection({
 										</span>
 									</a>
 								</div>
-								<div className="relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right">
+								<div
+									className={cn(
+										"relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right",
+										isEditing && "opacity-0",
+									)}
+								>
 									<time className="self-center text-xs text-muted-foreground tabular-nums transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-0 group-focus-within:opacity-0">
 										{formatCreatedAt(bookmark.createdAt)}
 									</time>
