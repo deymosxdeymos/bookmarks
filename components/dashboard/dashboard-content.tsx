@@ -91,7 +91,10 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 			userId: filter.userId,
 			categoryId: filter.categoryId,
 			sort: filter.sort,
-			cursor: filter.cursor,
+			cursor:
+				debouncedSearchDraft.trim() !== routeSearch.trim()
+					? undefined
+					: filter.cursor,
 			limit: filter.limit,
 			search: debouncedSearchDraft.trim() || undefined,
 		}),
@@ -102,6 +105,7 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 			filter.cursor,
 			filter.limit,
 			debouncedSearchDraft,
+			routeSearch,
 		],
 	);
 
