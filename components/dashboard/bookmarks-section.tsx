@@ -689,7 +689,7 @@ export function BookmarksSection({
 										<div className="relative">
 											{isInitialEdit && (
 												<span
-													className="absolute left-0 top-0 z-0 rounded-sm bg-yellow-200 px-1 text-sm font-medium opacity-100 pointer-events-none"
+													className="absolute left-0 top-0 z-0 bg-yellow-200 px-1 text-sm font-medium text-black opacity-100 pointer-events-none"
 													aria-hidden="true"
 												>
 													{editDraftRef.current}
@@ -719,7 +719,7 @@ export function BookmarksSection({
 												className={cn(
 													"relative z-10 h-auto w-full min-w-0 border-none bg-transparent text-sm font-medium outline-none [&::selection]:bg-transparent [&::-moz-selection]:bg-transparent",
 													isInitialEdit
-														? "text-transparent caret-black"
+														? "text-transparent caret-foreground"
 														: "text-foreground",
 												)}
 											/>
