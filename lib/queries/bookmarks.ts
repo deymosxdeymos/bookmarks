@@ -1,6 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	keepPreviousData,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import {
 	createBookmarkAction,
 	deleteBookmarkAction,
@@ -14,7 +19,7 @@ import type {
 	BookmarkFilter,
 } from "@/lib/schemas";
 
-export type BookmarksQueryKey = ReturnType<typeof bookmarksQueryKey>;
+type BookmarksQueryKey = ReturnType<typeof bookmarksQueryKey>;
 
 export function bookmarksQueryKey(filter: BookmarkFilter) {
 	return [
@@ -54,6 +59,7 @@ export function useBookmarks(filter: BookmarkFilter) {
 		queryFn: () => fetchBookmarks(filter),
 		staleTime: 60 * 1000,
 		gcTime: 5 * 60 * 1000,
+		placeholderData: keepPreviousData,
 	});
 }
 

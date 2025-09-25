@@ -37,25 +37,67 @@ export type ListResult = {
 	nextCursor?: string;
 };
 
+let trigramSupport: boolean | undefined;
+
+async function ensureTrigramSupport(): Promise<boolean> {
+	if (typeof trigramSupport === "boolean") {
+		return trigramSupport;
+	}
+	try {
+		const result = await query<{ installed: boolean }>(
+			"SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm') AS installed",
+		);
+		trigramSupport = Boolean(result.rows[0]?.installed);
+	} catch (error) {
+		console.warn(
+			"[bookmarks] failed to detect pg_trgm, defaulting to ILIKE",
+			error,
+		);
+		trigramSupport = false;
+	}
+	if (!trigramSupport) {
+		console.info("[bookmarks] pg_trgm not installed; using fallback search");
+	}
+	return trigramSupport;
+}
+
 export async function listBookmarks(
 	filter: BookmarkFilter,
 ): Promise<ListResult> {
 	const parsed = bookmarkFilterSchema.parse(filter);
 	const conditions = ["user_id = $1"];
 	const params: unknown[] = [parsed.userId];
+	const trigramEnabled = await ensureTrigramSupport();
 
 	if (parsed.categoryId) {
 		conditions.push(`category_id = $${params.length + 1}`);
 		params.push(parsed.categoryId);
 	}
 
-	if (parsed.search && parsed.search.trim().length > 0) {
-		const term = `%${parsed.search.trim()}%`;
-		const baseIndex = params.length;
-		conditions.push(
-			`(title ILIKE $${baseIndex + 1} OR domain ILIKE $${baseIndex + 2} OR url ILIKE $${baseIndex + 3})`,
-		);
-		params.push(term, term, term);
+	const orderParts: string[] = [];
+	const trimmedSearch = parsed.search?.trim();
+	if (trimmedSearch && trimmedSearch.length > 0) {
+		const likeTerm = `%${trimmedSearch}%`;
+		if (trigramEnabled) {
+			const searchParamIndex = params.length + 1;
+			params.push(trimmedSearch);
+			const similarityThreshold = computeSimilarityThreshold(trimmedSearch);
+			const thresholdParamIndex = params.length + 1;
+			params.push(similarityThreshold);
+			const likeParamStart = params.length + 1;
+			params.push(likeTerm, likeTerm, likeTerm);
+			const similarityExpression = `GREATEST(similarity(lower(title), lower($${searchParamIndex})), similarity(lower(domain), lower($${searchParamIndex})), similarity(lower(url), lower($${searchParamIndex})))`;
+			conditions.push(
+				`(((${similarityExpression}) >= $${thresholdParamIndex}) OR title ILIKE $${likeParamStart} OR domain ILIKE $${likeParamStart + 1} OR url ILIKE $${likeParamStart + 2})`,
+			);
+			orderParts.push(`${similarityExpression} DESC`);
+		} else {
+			const likeParamStart = params.length + 1;
+			params.push(likeTerm, likeTerm, likeTerm);
+			conditions.push(
+				`(title ILIKE $${likeParamStart} OR domain ILIKE $${likeParamStart + 1} OR url ILIKE $${likeParamStart + 2})`,
+			);
+		}
 	}
 
 	if (parsed.cursor) {
@@ -73,6 +115,8 @@ export async function listBookmarks(
 	const whereClause =
 		conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 	const direction = parsed.sort === "created-asc" ? "ASC" : "DESC";
+	orderParts.push(`created_at ${direction}`, `id ${direction}`);
+	const orderClause = `ORDER BY ${orderParts.join(", ")}`;
 	const limit = parsed.limit + 1;
 	params.push(limit);
 
@@ -81,7 +125,7 @@ export async function listBookmarks(
 		SELECT ${selectColumns}
 		FROM bookmarks
 		${whereClause}
-		ORDER BY created_at ${direction}, id ${direction}
+		${orderClause}
 		LIMIT $${params.length}
 		`,
 		params,
@@ -100,11 +144,25 @@ export async function listBookmarks(
 	};
 }
 
+function computeSimilarityThreshold(term: string): number {
+	const length = term.length;
+	if (length >= 12) {
+		return 0.35;
+	}
+	if (length >= 7) {
+		return 0.3;
+	}
+	if (length >= 4) {
+		return 0.25;
+	}
+	return 0.2;
+}
+
 function bookmarkTag(userId: string, categoryId?: string | null) {
 	return `bookmarks:${userId}:${categoryId ?? "all"}`;
 }
 
-export async function listBookmarksCached(
+async function _listBookmarksCached(
 	filter: BookmarkFilter,
 ): Promise<ListResult> {
 	const cached = unstable_cache(
@@ -316,7 +374,7 @@ export async function deleteCategory(userId: string, categoryId: string) {
 	);
 }
 
-export async function listCategoriesCached(userId: string) {
+async function _listCategoriesCached(userId: string) {
 	const cached = unstable_cache(
 		async () => listCategories(userId),
 		["listCategories", userId],

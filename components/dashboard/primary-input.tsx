@@ -4,16 +4,21 @@ import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCreateBookmark } from "@/lib/queries/bookmarks";
 
 type PrimaryInputProps = {
-	categoryId: string | null;
+	value: string;
+	onValueChange: (nextValue: string) => void;
+	onSubmit: (url: string) => Promise<void>;
+	isSubmitting: boolean;
 };
 
-export function PrimaryInput({ categoryId }: PrimaryInputProps) {
-	const formRef = useRef<HTMLFormElement>(null);
+export function PrimaryInput({
+	value,
+	onValueChange,
+	onSubmit,
+	isSubmitting,
+}: PrimaryInputProps) {
 	const inputRef = useRef<HTMLInputElement>(null);
-	const createBookmarkMutation = useCreateBookmark();
 
 	const focusFirstBookmark = useCallback(() => {
 		const first = document.querySelector<HTMLAnchorElement>(
@@ -27,15 +32,17 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 	}, []);
 
 	const handleSubmit = useCallback(
-		async (rawUrl: string) => {
-			let url = rawUrl.trim();
-			if (!/^\w[\w+.-]*:/.test(url)) {
-				url = `https://${url}`;
+		(rawUrl: string): Promise<void> => {
+			let normalized = rawUrl.trim();
+			if (!normalized) {
+				return Promise.resolve();
 			}
-			await createBookmarkMutation.mutateAsync({ url, categoryId });
-			formRef.current?.reset();
+			if (!/^\w[\w+.-]*:/.test(normalized)) {
+				normalized = `https://${normalized}`;
+			}
+			return onSubmit(normalized);
 		},
-		[categoryId, createBookmarkMutation],
+		[onSubmit],
 	);
 
 	useEffect(() => {
@@ -100,7 +107,7 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 				}
 			}
 
-			if (createBookmarkMutation.isPending) {
+			if (isSubmitting) {
 				return;
 			}
 
@@ -123,17 +130,16 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 		return () => {
 			document.removeEventListener("paste", handlePaste);
 		};
-	}, [createBookmarkMutation.isPending, handleSubmit]);
+	}, [handleSubmit, isSubmitting]);
 
-	const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
-		e.preventDefault();
-		const form = e.currentTarget;
-		const formData = new FormData(form);
+	const onSubmitForm: React.FormEventHandler<HTMLFormElement> = (event) => {
+		event.preventDefault();
+		const formData = new FormData(event.currentTarget);
 		const url = formData.get("url");
 		if (!url) {
 			return;
 		}
-		await handleSubmit(String(url));
+		void handleSubmit(String(url));
 	};
 
 	const onInputKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (
@@ -147,8 +153,7 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 
 	return (
 		<form
-			ref={formRef}
-			onSubmit={onSubmit}
+			onSubmit={onSubmitForm}
 			className="relative flex items-center gap-3 rounded-sm border bg-card px-2 shadow-sm"
 		>
 			<Plus className="h-5 w-5 text-muted-foreground" />
@@ -159,7 +164,11 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 				type="text"
 				autoComplete="off"
 				ref={inputRef}
-				disabled={createBookmarkMutation.isPending}
+				disabled={isSubmitting}
+				value={value}
+				onChange={(event) => {
+					onValueChange(event.target.value);
+				}}
 				onKeyDown={onInputKeyDown}
 				className="h-11 border-none bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
 			/>
@@ -171,11 +180,7 @@ export function PrimaryInput({ categoryId }: PrimaryInputProps) {
 					<span className="text-[0.625rem]">F</span>
 				</span>
 			</span>
-			<Button
-				type="submit"
-				disabled={createBookmarkMutation.isPending}
-				className="hidden"
-			>
+			<Button type="submit" disabled={isSubmitting} className="hidden">
 				Add
 			</Button>
 		</form>

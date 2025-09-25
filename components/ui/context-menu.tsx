@@ -20,7 +20,7 @@ function ContextMenuTrigger({
 	);
 }
 
-function ContextMenuGroup({
+function _ContextMenuGroup({
 	...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Group>) {
 	return (
@@ -28,7 +28,7 @@ function ContextMenuGroup({
 	);
 }
 
-function ContextMenuPortal({
+function _ContextMenuPortal({
 	...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Portal>) {
 	return (
@@ -134,7 +134,7 @@ function ContextMenuItem({
 	);
 }
 
-function ContextMenuCheckboxItem({
+function _ContextMenuCheckboxItem({
 	className,
 	children,
 	checked,
@@ -238,13 +238,10 @@ export {
 	ContextMenuTrigger,
 	ContextMenuContent,
 	ContextMenuItem,
-	ContextMenuCheckboxItem,
 	ContextMenuRadioItem,
 	ContextMenuLabel,
 	ContextMenuSeparator,
 	ContextMenuShortcut,
-	ContextMenuGroup,
-	ContextMenuPortal,
 	ContextMenuSub,
 	ContextMenuSubContent,
 	ContextMenuSubTrigger,

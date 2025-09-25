@@ -28,6 +28,8 @@ type BookmarksSectionProps = {
 	initialItems: Bookmark[];
 	queryKey: QueryKey;
 	categories: Category[];
+	filteredItems?: Bookmark[];
+	searchTerm?: string;
 };
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -44,6 +46,8 @@ export function BookmarksSection({
 	initialItems,
 	queryKey,
 	categories,
+	filteredItems,
+	searchTerm = "",
 }: BookmarksSectionProps) {
 	const rootRef = useRef<HTMLUListElement>(null);
 	const queryClient = useQueryClient();
@@ -117,12 +121,12 @@ export function BookmarksSection({
 	}, [queryClient, queryKey]);
 
 	const getVisibleItems = useCallback(() => {
-		const baseItems = getCurrentItems();
+		const baseItems = filteredItems ?? getCurrentItems();
 		const pendingDeleteIds = new Set(
 			undoStackRef.current.map((item) => item.bookmark.id),
 		);
 		return baseItems.filter((item) => !pendingDeleteIds.has(item.id));
-	}, [getCurrentItems]);
+	}, [filteredItems, getCurrentItems]);
 
 	const triggerFeedback = useCallback(
 		(bookmarkId: string, type: "copied" | "renamed") => {
@@ -622,9 +626,13 @@ export function BookmarksSection({
 	]);
 
 	if (items.length === 0) {
+		const trimmedSearch = searchTerm.trim();
+		const hasSearchQuery = trimmedSearch.length > 0;
 		return (
 			<div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">
-				No bookmarks yet. Paste a link above to create one instantly.
+				{hasSearchQuery
+					? `No bookmarks match "${trimmedSearch}".`
+					: "No bookmarks yet. Paste a link above to create one instantly."}
 			</div>
 		);
 	}

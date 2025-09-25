@@ -18,7 +18,7 @@ export const Command = forwardRef<
 ));
 Command.displayName = CommandPrimitive.displayName;
 
-export const CommandInput = forwardRef<
+const CommandInput = forwardRef<
 	React.ElementRef<typeof CommandPrimitive.Input>,
 	React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
@@ -47,7 +47,7 @@ export const CommandList = forwardRef<
 ));
 CommandList.displayName = CommandPrimitive.List.displayName;
 
-export const CommandEmpty = forwardRef<
+const CommandEmpty = forwardRef<
 	React.ElementRef<typeof CommandPrimitive.Empty>,
 	React.ComponentPropsWithoutRef<typeof CommandPrimitive.Empty>
 >(({ className, ...props }, ref) => (
@@ -59,7 +59,7 @@ export const CommandEmpty = forwardRef<
 ));
 CommandEmpty.displayName = CommandPrimitive.Empty.displayName;
 
-export const CommandGroup = forwardRef<
+const CommandGroup = forwardRef<
 	React.ElementRef<typeof CommandPrimitive.Group>,
 	React.ComponentPropsWithoutRef<typeof CommandPrimitive.Group>
 >(({ className, ...props }, ref) => (
@@ -101,7 +101,7 @@ export const CommandSeparator = forwardRef<
 ));
 CommandSeparator.displayName = CommandPrimitive.Separator.displayName;
 
-export const CommandShortcut = ({
+const _CommandShortcut = ({
 	className,
 	...props
 }: React.HTMLAttributes<HTMLSpanElement>) => (

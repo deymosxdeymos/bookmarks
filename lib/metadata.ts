@@ -1,4 +1,4 @@
-export type MetadataResult = {
+type MetadataResult = {
 	title: string;
 	description?: string;
 	iconUrl?: string;
