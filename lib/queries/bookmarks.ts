@@ -21,6 +21,10 @@ import type {
 
 type BookmarksQueryKey = ReturnType<typeof bookmarksQueryKey>;
 
+function invalidateBookmarkQueries(qc: ReturnType<typeof useQueryClient>) {
+	qc.invalidateQueries({ queryKey: ["bookmarks"] });
+}
+
 export function bookmarksQueryKey(filter: BookmarkFilter) {
 	return [
 		"bookmarks",
@@ -60,6 +64,9 @@ export function useBookmarks(filter: BookmarkFilter) {
 		staleTime: 60 * 1000,
 		gcTime: 5 * 60 * 1000,
 		placeholderData: keepPreviousData,
+		refetchOnWindowFocus: false,
+		refetchOnMount: true,
+		refetchInterval: false,
 	});
 }
 
@@ -101,8 +108,7 @@ export function useCreateBookmark() {
 					});
 				});
 
-			// Invalidate all bookmark queries to refetch fresh data
-			queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+			invalidateBookmarkQueries(queryClient);
 		},
 	});
 }
@@ -116,10 +122,8 @@ export function useDeleteBookmark() {
 			return bookmarkId;
 		},
 		onMutate: async (bookmarkId) => {
-			// Cancel all bookmark queries
 			await queryClient.cancelQueries({ queryKey: ["bookmarks"] });
 
-			// Get all bookmark query data to restore on error
 			const previousQueries = new Map();
 			queryClient
 				.getQueriesData({ queryKey: ["bookmarks"] })
@@ -127,7 +131,6 @@ export function useDeleteBookmark() {
 					previousQueries.set(queryKey, data);
 				});
 
-			// Optimistically update all bookmark queries
 			queryClient.setQueriesData(
 				{ queryKey: ["bookmarks"] },
 				(old: ListResult | undefined) => {
@@ -146,7 +149,6 @@ export function useDeleteBookmark() {
 			return { previousQueries, bookmarkId };
 		},
 		onError: (_, __, context) => {
-			// Restore all previous queries on error
 			if (context?.previousQueries) {
 				context.previousQueries.forEach((data, queryKey) => {
 					queryClient.setQueryData(queryKey, data);
@@ -154,8 +156,7 @@ export function useDeleteBookmark() {
 			}
 		},
 		onSettled: () => {
-			// Invalidate all bookmark queries to refetch
-			queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+			invalidateBookmarkQueries(queryClient);
 		},
 	});
 }
@@ -236,7 +237,7 @@ export function useUpdateBookmarkTitle() {
 			}
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+			invalidateBookmarkQueries(queryClient);
 		},
 	});
 }
@@ -334,7 +335,8 @@ export function useSetBookmarkCategory() {
 			}
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+			invalidateBookmarkQueries(queryClient);
+			// Only invalidate categories since category counts may change
 			queryClient.invalidateQueries({ queryKey: ["categories"] });
 		},
 	});

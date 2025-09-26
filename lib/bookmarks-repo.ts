@@ -1,4 +1,4 @@
-import { revalidateTag, unstable_cache } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { query } from "@/lib/db";
 import { getMetadata } from "@/lib/metadata";
 import {
@@ -162,28 +162,6 @@ function bookmarkTag(userId: string, categoryId?: string | null) {
 	return `bookmarks:${userId}:${categoryId ?? "all"}`;
 }
 
-async function _listBookmarksCached(
-	filter: BookmarkFilter,
-): Promise<ListResult> {
-	const cached = unstable_cache(
-		async () => listBookmarks(filter),
-		[
-			"listBookmarks",
-			filter.userId,
-			filter.categoryId ?? "all",
-			filter.search ?? "",
-			filter.sort,
-			String(filter.limit),
-			filter.cursor ?? "",
-		],
-		{
-			revalidate: 60,
-			tags: [bookmarkTag(filter.userId, filter.categoryId ?? null)],
-		},
-	);
-	return cached();
-}
-
 export async function createBookmark(
 	userId: string,
 	input: BookmarkCreateInput,
@@ -339,7 +317,7 @@ export async function listCategories(userId: string) {
 	return rows.map(mapCategoryRow);
 }
 
-function categoryTag(userId: string) {
+function _categoryTag(userId: string) {
 	return `categories:${userId}`;
 }
 
@@ -372,15 +350,6 @@ export async function deleteCategory(userId: string, categoryId: string) {
 		`,
 		[categoryId, userId],
 	);
-}
-
-async function _listCategoriesCached(userId: string) {
-	const cached = unstable_cache(
-		async () => listCategories(userId),
-		["listCategories", userId],
-		{ revalidate: 300, tags: [categoryTag(userId)] },
-	);
-	return cached();
 }
 
 export async function setBookmarkCategory(
