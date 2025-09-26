@@ -1,7 +1,7 @@
 "use client";
 
 import { parseAsString, useQueryStates } from "nuqs";
-import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
+import { Suspense, useCallback, useMemo } from "react";
 import { BookmarksSection } from "@/components/dashboard/bookmarks-section";
 import { DashboardNav } from "@/components/dashboard/nav";
 import { PrimaryInput } from "@/components/dashboard/primary-input";
@@ -19,7 +19,7 @@ import {
 	useCreateBookmark,
 } from "@/lib/queries/bookmarks";
 import { useCategories } from "@/lib/queries/categories";
-import type { Bookmark, BookmarkFilter } from "@/lib/schemas";
+import type { BookmarkFilter } from "@/lib/schemas";
 
 type SessionUser = {
 	id: string;
@@ -105,7 +105,6 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 	const {
 		data: bookmarksResult,
 		isLoading: bookmarksLoading,
-		isFetching: bookmarksFetching,
 		error: bookmarksError,
 	} = useBookmarks(serverFilter);
 	const { data: categories = [], error: categoriesError } = useCategories(
@@ -138,35 +137,9 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 		console.error("failed to load categories", categoriesError);
 	}
 
+	// Date transformation now handled in useBookmarks select
 	const bookmarks = bookmarksResult?.items ?? [];
-	const enrichedItems: Bookmark[] = useMemo(
-		() =>
-			bookmarks.map((bookmark) => ({
-				...bookmark,
-				createdAt:
-					bookmark.createdAt instanceof Date
-						? bookmark.createdAt
-						: new Date(String(bookmark.createdAt)),
-				updatedAt:
-					bookmark.updatedAt instanceof Date
-						? bookmark.updatedAt
-						: new Date(String(bookmark.updatedAt)),
-			})),
-		[bookmarks],
-	);
-
-	const previousItemsRef = useRef<Bookmark[]>(enrichedItems);
-	useEffect(() => {
-		if (bookmarksFetching) {
-			return;
-		}
-		previousItemsRef.current = enrichedItems;
-	}, [bookmarksFetching, enrichedItems]);
-
-	const optimisticSource = useMemo(
-		() => (bookmarksFetching ? previousItemsRef.current : enrichedItems),
-		[bookmarksFetching, enrichedItems],
-	);
+	const optimisticSource = bookmarks;
 
 	const rankedMatches = useMemo(() => {
 		// When using server-side search, we trust the server's results
@@ -308,12 +281,14 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 					}
 				>
 					{bookmarksLoading && !bookmarksResult ? (
+						// Show loading skeleton only when no cached data exists
+						// placeholderData will prevent this for filter changes with cached data
 						<div className="space-y-3">
 							<RowSkeleton count={8} />
 						</div>
 					) : (
 						<BookmarksSection
-							initialItems={enrichedItems}
+							initialItems={bookmarks}
 							queryKey={queryKey}
 							categories={categories}
 							filteredItems={matchedBookmarks}
