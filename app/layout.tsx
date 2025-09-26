@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { LoadingBar } from "@/components/loading-bar";
 import { QueryProvider } from "@/components/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -45,9 +46,11 @@ export default function RootLayout({
 						enableSystem
 						disableTransitionOnChange
 					>
-						<LoadingBar />
-						{children}
-						<Toaster />
+						<NuqsAdapter>
+							<LoadingBar />
+							{children}
+							<Toaster />
+						</NuqsAdapter>
 					</ThemeProvider>
 				</QueryProvider>
 			</body>

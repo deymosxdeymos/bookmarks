@@ -9,36 +9,9 @@ import {
 	bookmarkFilterSchema,
 	sortOrderSchema,
 } from "@/lib/schemas";
+import { searchParamsCache } from "@/lib/search-params";
 
 type RawSearchParams = Record<string, string | string[] | undefined>;
-
-const searchParamsSchema = z.object({
-	category: z.string().uuid().optional(),
-	search: z.string().optional(),
-	sort: sortOrderSchema.optional(),
-	cursor: z.string().optional(),
-});
-
-function normalizeParams(params: RawSearchParams) {
-	return {
-		category:
-			typeof params.category === "string" && params.category.length > 0
-				? params.category
-				: undefined,
-		search:
-			typeof params.search === "string" && params.search.length > 0
-				? params.search
-				: undefined,
-		sort:
-			typeof params.sort === "string" && params.sort.length > 0
-				? params.sort
-				: undefined,
-		cursor:
-			typeof params.cursor === "string" && params.cursor.length > 0
-				? params.cursor
-				: undefined,
-	};
-}
 
 export default async function DashboardPage({
 	searchParams,
@@ -54,9 +27,25 @@ export default async function DashboardPage({
 	}
 
 	const resolvedParams = await searchParams;
-	const normalized = normalizeParams(resolvedParams);
-	const parsedParams = searchParamsSchema.safeParse(normalized);
-	const input = parsedParams.success ? parsedParams.data : {};
+	const { search, category, sort, cursor } =
+		await searchParamsCache.parse(resolvedParams);
+
+	// Preserve validation guarantees with Zod
+	const validationSchema = z.object({
+		category: z.string().uuid().optional(),
+		search: z.string().optional(),
+		sort: sortOrderSchema.optional(),
+		cursor: z.string().optional(),
+	});
+
+	const validatedParams = validationSchema.safeParse({
+		category: category || undefined,
+		search: search || undefined,
+		sort: sort || undefined,
+		cursor: cursor || undefined,
+	});
+
+	const input = validatedParams.success ? validatedParams.data : {};
 	const filter: BookmarkFilter = bookmarkFilterSchema.parse({
 		...bookmarkFilterInputSchema.parse({
 			categoryId: input.category,

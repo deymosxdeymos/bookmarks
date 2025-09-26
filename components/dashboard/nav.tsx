@@ -18,9 +18,15 @@ type DashboardNavProps = {
 	user: SessionUser;
 	categories: Category[];
 	filter: BookmarkFilter;
+	onCategoryChange: (categoryId: string | null) => void;
 };
 
-export function DashboardNav({ user, categories, filter }: DashboardNavProps) {
+export function DashboardNav({
+	user,
+	categories,
+	filter,
+	onCategoryChange,
+}: DashboardNavProps) {
 	return (
 		<nav className="flex items-center justify-between gap-4">
 			<div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -36,6 +42,7 @@ export function DashboardNav({ user, categories, filter }: DashboardNavProps) {
 					userId={user.id}
 					categories={categories}
 					selectedId={filter.categoryId ?? null}
+					onCategoryChange={onCategoryChange}
 				/>
 			</div>
 			<UserMenu user={user} />

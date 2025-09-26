@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, ChevronsUpDown, Loader2, Plus, Trash2 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -29,12 +28,14 @@ type CategoryComboboxProps = {
 	userId: string;
 	categories: Category[];
 	selectedId: string | null;
+	onCategoryChange: (categoryId: string | null) => void;
 };
 
 export function CategoryCombobox({
 	userId,
 	categories,
 	selectedId,
+	onCategoryChange,
 }: CategoryComboboxProps) {
 	const [open, setOpen] = useState(false);
 	const [isCreating, setIsCreating] = useState(false);
@@ -43,8 +44,6 @@ export function CategoryCombobox({
 	const holdStartRef = useRef<number | null>(null);
 	const holdActiveRef = useRef(false);
 	const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const router = useRouter();
-	const searchParams = useSearchParams();
 	const createFormRef = useRef<HTMLFormElement>(null);
 	const createInputRef = useRef<HTMLInputElement>(null);
 	const createCategoryMutation = useCreateCategory(userId);
@@ -103,16 +102,9 @@ export function CategoryCombobox({
 
 	const applySelection = useCallback(
 		(id: string | null) => {
-			const params = new URLSearchParams(searchParams.toString());
-			if (id) {
-				params.set("category", id);
-			} else {
-				params.delete("category");
-			}
-			params.delete("cursor");
-			router.replace(`?${params.toString()}`, { scroll: false });
+			onCategoryChange(id);
 		},
-		[router, searchParams],
+		[onCategoryChange],
 	);
 
 	const optionHotkeysRef = useRef(optionHotkeys);
@@ -195,7 +187,7 @@ export function CategoryCombobox({
 		try {
 			const category = await createCategoryMutation.mutateAsync(trimmed);
 			setOpen(false);
-			applySelection(category.id);
+			onCategoryChange(category.id);
 		} catch (error) {
 			console.error("create category failed", error);
 			toast.error("Could not create group. Try again.");

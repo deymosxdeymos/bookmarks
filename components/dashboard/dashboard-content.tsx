@@ -1,14 +1,7 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-	Suspense,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+import { parseAsString, useQueryStates } from "nuqs";
+import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { BookmarksSection } from "@/components/dashboard/bookmarks-section";
 import { DashboardNav } from "@/components/dashboard/nav";
 import { PrimaryInput } from "@/components/dashboard/primary-input";
@@ -70,18 +63,18 @@ function RowSkeleton({ count }: { count: number }) {
 	);
 }
 
+// Client parsers (separate from server to avoid boundary violations)
+const clientParsers = {
+	search: parseAsString.withDefault("").withOptions({ scroll: false }),
+	category: parseAsString.withOptions({ scroll: false }),
+	cursor: parseAsString.withOptions({ scroll: false }),
+};
+
 export function DashboardContent({ user, filter }: DashboardContentProps) {
-	const router = useRouter();
-	const pathname = usePathname();
-	const searchParams = useSearchParams();
-	const searchParamsSnapshot = searchParams.toString();
-	const routeSearch = searchParams.get("search") ?? "";
-	const [searchDraft, setSearchDraft] = useState(filter.search ?? "");
-	const lastPushedSearchRef = useRef<string | null>(null);
-	const previousRouteSearchRef = useRef(routeSearch);
+	const [{ search: routeSearch }, setUrlState] = useQueryStates(clientParsers);
 	const createBookmarkMutation = useCreateBookmark();
-	const debouncedSearchDraft = useDebouncedValue(
-		searchDraft,
+	const debouncedSearch = useDebouncedValue(
+		routeSearch,
 		SEARCH_INPUT_DEBOUNCE_MS,
 	);
 
@@ -92,11 +85,11 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 			categoryId: filter.categoryId,
 			sort: filter.sort,
 			cursor:
-				debouncedSearchDraft.trim() !== routeSearch.trim()
+				debouncedSearch.trim() !== routeSearch.trim()
 					? undefined
 					: filter.cursor,
 			limit: filter.limit,
-			search: debouncedSearchDraft.trim() || undefined,
+			search: debouncedSearch.trim() || undefined,
 		}),
 		[
 			filter.userId,
@@ -104,7 +97,7 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 			filter.sort,
 			filter.cursor,
 			filter.limit,
-			debouncedSearchDraft,
+			debouncedSearch,
 			routeSearch,
 		],
 	);
@@ -121,72 +114,21 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 
 	const handleCategoryChange = useCallback(
 		(categoryId: string | null) => {
-			const params = new URLSearchParams(searchParamsSnapshot);
-			if (categoryId) {
-				params.set("category", categoryId);
-			} else {
-				params.delete("category");
-			}
-			params.delete("cursor");
-			router.replace(params.toString() ? `${pathname}?${params}` : pathname, {
-				scroll: false,
-			});
+			setUrlState(
+				{
+					category: categoryId,
+					cursor: null, // Clear pagination on filter change
+				},
+				{ shallow: false },
+			);
 		},
-		[pathname, router, searchParamsSnapshot],
+		[setUrlState],
 	);
 
 	useGlobalCategoryHotkeys({
 		categories,
 		onCategoryChange: handleCategoryChange,
 	});
-
-	useEffect(() => {
-		if (routeSearch === previousRouteSearchRef.current) {
-			return;
-		}
-		previousRouteSearchRef.current = routeSearch;
-		const normalizedRoute = routeSearch.trim();
-		if (
-			lastPushedSearchRef.current !== null &&
-			normalizedRoute === lastPushedSearchRef.current
-		) {
-			lastPushedSearchRef.current = null;
-			debugLog("[dashboard-search] route ack", normalizedRoute || "(empty)");
-			return;
-		}
-		if (normalizedRoute === searchDraft.trim()) {
-			return;
-		}
-		debugLog("[dashboard-search] route -> draft", normalizedRoute || "(empty)");
-		setSearchDraft(normalizedRoute);
-	}, [routeSearch, searchDraft]);
-
-	useEffect(() => {
-		const trimmedDraft = debouncedSearchDraft.trim();
-		const normalizedRoute = routeSearch.trim();
-		if (trimmedDraft === normalizedRoute) {
-			return;
-		}
-		lastPushedSearchRef.current = trimmedDraft;
-		const params = new URLSearchParams(searchParamsSnapshot);
-		if (trimmedDraft.length === 0) {
-			params.delete("search");
-		} else {
-			params.set("search", trimmedDraft);
-		}
-		params.delete("cursor");
-		const nextQuery = params.toString();
-		debugLog("[dashboard-search] draft -> route", trimmedDraft || "(empty)");
-		router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
-			scroll: false,
-		});
-	}, [
-		debouncedSearchDraft,
-		routeSearch,
-		pathname,
-		router,
-		searchParamsSnapshot,
-	]);
 
 	if (bookmarksError) {
 		console.error("failed to load bookmarks", bookmarksError);
@@ -228,19 +170,19 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 
 	const rankedMatches = useMemo(() => {
 		// When using server-side search, we trust the server's results
-		if (debouncedSearchDraft.trim()) {
+		if (debouncedSearch.trim()) {
 			return optimisticSource.map((bookmark) => ({ bookmark, score: 1 }));
 		}
-		return rankBookmarks(optimisticSource, debouncedSearchDraft);
-	}, [optimisticSource, debouncedSearchDraft]);
+		return rankBookmarks(optimisticSource, debouncedSearch);
+	}, [optimisticSource, debouncedSearch]);
 
 	const matchedBookmarks = useMemo(() => {
 		// With server-side search, use all returned bookmarks when searching
-		if (debouncedSearchDraft.trim()) {
+		if (debouncedSearch.trim()) {
 			return optimisticSource;
 		}
 		return rankedMatches.map((entry) => entry.bookmark);
-	}, [optimisticSource, debouncedSearchDraft, rankedMatches]);
+	}, [optimisticSource, debouncedSearch, rankedMatches]);
 
 	const focusBookmarkById = useCallback((bookmarkId: string) => {
 		const anchor = document.querySelector<HTMLAnchorElement>(
@@ -278,14 +220,14 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 			if (
 				topMatch &&
 				topMatch.score >= BOOKMARK_STRONG_MATCH_THRESHOLD &&
-				debouncedSearchDraft.trim() === url.trim()
+				debouncedSearch.trim() === url.trim()
 			) {
 				focusBookmarkById(topMatch.bookmark.id);
 				return;
 			}
 
-			const previousDraft = searchDraft;
-			setSearchDraft("");
+			const previousSearch = routeSearch;
+			setUrlState({ search: null, cursor: null });
 			try {
 				await createBookmarkMutation.mutateAsync({
 					url,
@@ -293,9 +235,13 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 				});
 			} catch (error) {
 				console.error("create bookmark failed", error);
-				setSearchDraft((current) =>
-					current.trim().length === 0 ? previousDraft : current,
-				);
+				setUrlState((current) => {
+					// Only restore if the user hasn't typed something new
+					if (current.search?.trim().length === 0 || current.search === null) {
+						return { search: previousSearch, cursor: null };
+					}
+					return current;
+				});
 			}
 		},
 		[
@@ -304,27 +250,39 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 			focusBookmarkById,
 			rankedMatches,
 			optimisticSource,
-			searchDraft,
-			debouncedSearchDraft,
+			routeSearch,
+			debouncedSearch,
+			setUrlState,
 		],
 	);
 
 	const matchCount =
-		debouncedSearchDraft.trim().length > 0 ? optimisticSource.length : null;
+		routeSearch.trim().length > 0 ? optimisticSource.length : null;
 	const queryKey = bookmarksQueryKey(filter);
 
-	const handleSearchDraftChange = useCallback((nextValue: string) => {
-		debugLog("[dashboard-search] input", nextValue || "(empty)");
-		setSearchDraft(nextValue);
-	}, []);
+	const handleSearchChange = useCallback(
+		(nextValue: string) => {
+			debugLog("[dashboard-search] input", nextValue || "(empty)");
+			setUrlState({
+				search: nextValue || null,
+				cursor: null,
+			});
+		},
+		[setUrlState],
+	);
 
 	return (
 		<div className="flex min-h-svh flex-col">
 			<div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-8">
-				<DashboardNav user={user} categories={categories} filter={filter} />
+				<DashboardNav
+					user={user}
+					categories={categories}
+					filter={filter}
+					onCategoryChange={handleCategoryChange}
+				/>
 				<PrimaryInput
-					value={searchDraft}
-					onValueChange={handleSearchDraftChange}
+					value={routeSearch}
+					onValueChange={handleSearchChange}
 					onSubmit={handleBookmarkSubmit}
 					isSubmitting={createBookmarkMutation.isPending}
 				/>
@@ -359,7 +317,7 @@ export function DashboardContent({ user, filter }: DashboardContentProps) {
 							queryKey={queryKey}
 							categories={categories}
 							filteredItems={matchedBookmarks}
-							searchTerm={debouncedSearchDraft}
+							searchTerm={debouncedSearch}
 						/>
 					)}
 				</Suspense>
