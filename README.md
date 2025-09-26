@@ -11,3 +11,9 @@ Tools:
 - Shadcn/UI for ui components
 - Supabase for database
 - Tailwind for styling
+
+## Development
+
+- Run `bun dev` to start the app. The helper script ensures the Postgres service from `docker-compose.yml` is running (`docker compose up -d postgres`), waits for it to become ready, and then launches `next dev --turbopack`.
+- Local defaults use the connection string `postgresql://postgres:postgres@127.0.0.1:5432/bookmarks`. Set `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, or `POSTGRES_PORT` before `bun dev` to override any of these values.
+- The Supabase client is disabled outside production unless you explicitly opt in by setting `NEXT_PUBLIC_USE_SUPABASE=true` and providing `NEXT_PUBLIC_SUPABASE_URL` plus `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.

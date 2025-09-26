@@ -4,11 +4,7 @@ import { revalidateTag } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import {
-	createCategory,
-	deleteCategory,
-	listCategories,
-} from "@/lib/bookmarks-repo";
+import { createCategory, deleteCategory } from "@/lib/bookmarks-repo";
 import {
 	type CategoryCreateInput,
 	categoryCreateSchema,
@@ -31,11 +27,6 @@ async function requireSession() {
 		redirect("/login");
 	}
 	return session;
-}
-
-export async function listCategoriesAction() {
-	const session = await requireSession();
-	return listCategories(session.user.id);
 }
 
 export async function createCategoryAction(input: CategoryCreateInput) {

@@ -14,8 +14,6 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { BookmarkContextMenu } from "@/components/dashboard/bookmark-context-menu";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import type { ListResult } from "@/lib/bookmarks-repo";
 import { fallbackIcon } from "@/lib/metadata";
 import {
@@ -30,6 +28,8 @@ type BookmarksSectionProps = {
 	initialItems: Bookmark[];
 	queryKey: QueryKey;
 	categories: Category[];
+	filteredItems?: Bookmark[];
+	searchTerm?: string;
 };
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -46,6 +46,8 @@ export function BookmarksSection({
 	initialItems,
 	queryKey,
 	categories,
+	filteredItems,
+	searchTerm = "",
 }: BookmarksSectionProps) {
 	const rootRef = useRef<HTMLUListElement>(null);
 	const queryClient = useQueryClient();
@@ -57,6 +59,8 @@ export function BookmarksSection({
 	const [activeEditId, setActiveEditId] = useState<string | null>(null);
 	const [editDraft, setEditDraft] = useState("");
 	const [pendingEditId, setPendingEditId] = useState<string | null>(null);
+	const [isInitialEdit, setIsInitialEdit] = useState(false);
+	const editDraftRef = useRef("");
 	const [feedback, setFeedback] = useState<{
 		id: string;
 		type: "copied" | "renamed";
@@ -117,12 +121,12 @@ export function BookmarksSection({
 	}, [queryClient, queryKey]);
 
 	const getVisibleItems = useCallback(() => {
-		const baseItems = getCurrentItems();
+		const baseItems = filteredItems ?? getCurrentItems();
 		const pendingDeleteIds = new Set(
 			undoStackRef.current.map((item) => item.bookmark.id),
 		);
 		return baseItems.filter((item) => !pendingDeleteIds.has(item.id));
-	}, [getCurrentItems]);
+	}, [filteredItems, getCurrentItems]);
 
 	const triggerFeedback = useCallback(
 		(bookmarkId: string, type: "copied" | "renamed") => {
@@ -171,17 +175,23 @@ export function BookmarksSection({
 		lastFocusedBookmarkIdRef.current = bookmark.id;
 		setActiveEditId(bookmark.id);
 		setEditDraft(bookmark.title);
+		editDraftRef.current = bookmark.title;
+		setIsInitialEdit(true);
 	}, []);
 
 	const cancelInlineRename = useCallback(() => {
 		setActiveEditId(null);
 		setEditDraft("");
+		editDraftRef.current = "";
 		setPendingEditId(null);
+		setIsInitialEdit(false);
 	}, []);
 
 	const commitInlineRename = useCallback(async () => {
 		if (!activeEditId) return;
-		const trimmed = editDraft.trim();
+		const currentValue =
+			inlineEditInputRef.current?.value || editDraftRef.current;
+		const trimmed = currentValue.trim();
 		if (!trimmed) {
 			toast.error("Title cannot be empty.");
 			return;
@@ -196,6 +206,7 @@ export function BookmarksSection({
 			toast.success("Updated title");
 			setActiveEditId(null);
 			setEditDraft("");
+			setIsInitialEdit(false);
 			lastFocusedBookmarkIdRef.current = activeEditId;
 		} catch (error) {
 			console.error("rename bookmark failed", error);
@@ -203,7 +214,7 @@ export function BookmarksSection({
 		} finally {
 			setPendingEditId(null);
 		}
-	}, [activeEditId, editDraft, triggerFeedback, updateBookmarkMutation]);
+	}, [activeEditId, triggerFeedback, updateBookmarkMutation]);
 
 	const handleInlineEditSubmit = useCallback(
 		(event: FormEvent<HTMLFormElement>) => {
@@ -615,9 +626,13 @@ export function BookmarksSection({
 	]);
 
 	if (items.length === 0) {
+		const trimmedSearch = searchTerm.trim();
+		const hasSearchQuery = trimmedSearch.length > 0;
 		return (
 			<div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">
-				No bookmarks yet. Paste a link above to create one instantly.
+				{hasSearchQuery
+					? `No bookmarks match "${trimmedSearch}".`
+					: "No bookmarks yet. Paste a link above to create one instantly."}
 			</div>
 		);
 	}
@@ -641,8 +656,6 @@ export function BookmarksSection({
 				const listItemClassName = cn(
 					"group relative flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-[var(--ease-out-quart)]",
 					!isEditing && "hover:bg-accent focus-within:bg-accent",
-					(isEditing || showRenameFeedback) &&
-						"bg-amber-100 text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300",
 					showRenameFeedback &&
 						!isEditing &&
 						"motion-safe:animate-in motion-safe:fade-in-0",
@@ -673,47 +686,48 @@ export function BookmarksSection({
 										referrerPolicy="no-referrer"
 									/>
 									<div className="flex flex-1 flex-col gap-1">
-										<Input
-											ref={inlineEditInputRef}
-											value={editDraft}
-											onChange={(event) => setEditDraft(event.target.value)}
-											onFocus={() => {
-												lastFocusedBookmarkIdRef.current = bookmark.id;
-											}}
-											onKeyDown={(event) => {
-												if (event.key === "Escape") {
-													event.preventDefault();
-													cancelInlineRename();
-												}
-											}}
-											aria-label={`Edit title for ${bookmark.domain}`}
-											disabled={pendingEditId === bookmark.id}
-											maxLength={256}
-											className="h-8 w-full text-sm"
-										/>
+										<div className="relative">
+											{isInitialEdit && (
+												<span
+													className="absolute left-0 top-0 z-0 bg-yellow-200 px-1 text-sm font-medium text-black opacity-100 pointer-events-none"
+													aria-hidden="true"
+												>
+													{editDraftRef.current}
+												</span>
+											)}
+											<input
+												ref={inlineEditInputRef}
+												defaultValue={editDraft}
+												onChange={(event) => {
+													editDraftRef.current = event.target.value;
+													if (isInitialEdit) {
+														setIsInitialEdit(false);
+													}
+												}}
+												onFocus={() => {
+													lastFocusedBookmarkIdRef.current = bookmark.id;
+												}}
+												onKeyDown={(event) => {
+													if (event.key === "Escape") {
+														event.preventDefault();
+														cancelInlineRename();
+													}
+												}}
+												aria-label={`Edit title for ${bookmark.domain}`}
+												disabled={pendingEditId === bookmark.id}
+												maxLength={100}
+												className={cn(
+													"relative z-10 h-auto w-full min-w-0 border-none bg-transparent text-sm font-medium outline-none [&::selection]:bg-transparent [&::-moz-selection]:bg-transparent",
+													isInitialEdit
+														? "text-transparent caret-foreground"
+														: "text-foreground",
+												)}
+											/>
+										</div>
 										<span className="truncate text-xs text-muted-foreground">
 											{bookmark.domain}
 										</span>
 									</div>
-								</div>
-								<div className="flex items-center gap-2">
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onClick={cancelInlineRename}
-										disabled={pendingEditId === bookmark.id}
-									>
-										Cancel
-									</Button>
-									<Button
-										type="submit"
-										size="sm"
-										disabled={pendingEditId === bookmark.id}
-										className="bg-foreground text-background hover:bg-foreground/90"
-									>
-										{pendingEditId === bookmark.id ? "Saving…" : "Save"}
-									</Button>
 								</div>
 							</form>
 						) : (
@@ -735,7 +749,10 @@ export function BookmarksSection({
 										onMouseEnter={() => {
 											lastFocusedBookmarkIdRef.current = bookmark.id;
 										}}
-										className="flex max-w-[75%] items-center gap-3 rounded-md outline-none focus-visible:bg-transparent focus:bg-transparent"
+										className={cn(
+											"flex max-w-[75%] items-center gap-3 rounded-md outline-none focus-visible:bg-transparent focus:bg-transparent",
+											isEditing && "pointer-events-none opacity-0",
+										)}
 										style={{ touchAction: "manipulation" }}
 									>
 										<span className="relative size-8 shrink-0 overflow-hidden rounded-md border bg-muted">
@@ -745,10 +762,10 @@ export function BookmarksSection({
 												height={32}
 												width={32}
 												className={cn(
-													"absolute inset-0 size-full object-cover motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													"size-full object-cover motion-safe:transition-transform motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-in-out-quart)]",
 													showCopyFeedback
-														? "translate-y-full opacity-0"
-														: "translate-y-0 opacity-100",
+														? "translate-y-full"
+														: "translate-y-0",
 												)}
 												unoptimized
 												referrerPolicy="no-referrer"
@@ -756,10 +773,10 @@ export function BookmarksSection({
 											<span
 												aria-hidden
 												className={cn(
-													"absolute inset-0 flex items-center justify-center bg-background/95 text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													"absolute inset-0 flex items-center justify-center bg-background/95 text-foreground motion-safe:transition-transform motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-in-out-quart)]",
 													showCopyFeedback
-														? "translate-y-0 opacity-100"
-														: "-translate-y-full opacity-0",
+														? "translate-y-0"
+														: "-translate-y-full",
 												)}
 											>
 												<Check className="size-4" />
@@ -768,12 +785,11 @@ export function BookmarksSection({
 										<span className="relative flex min-h-[2.25rem] flex-col justify-center overflow-hidden">
 											<span
 												className={cn(
-													"flex flex-col gap-1 motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													"flex flex-col gap-1 motion-safe:transition-transform motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-in-out-quart)]",
 													showCopyFeedback
-														? "translate-y-full opacity-0"
-														: "translate-y-0 opacity-100",
+														? "translate-y-full"
+														: "translate-y-0",
 												)}
-												aria-hidden={showCopyFeedback}
 											>
 												<span className="truncate text-sm font-medium text-foreground">
 													{bookmark.title}
@@ -784,12 +800,11 @@ export function BookmarksSection({
 											</span>
 											<span
 												className={cn(
-													"absolute inset-0 flex items-center text-sm font-medium text-foreground motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)] motion-safe:will-change-transform",
+													"absolute inset-0 flex items-center text-sm font-medium text-foreground motion-safe:transition-transform motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-in-out-quart)]",
 													showCopyFeedback
-														? "translate-y-0 opacity-100"
-														: "-translate-y-full opacity-0",
+														? "translate-y-0"
+														: "-translate-y-full",
 												)}
-												style={{ transformOrigin: "top left" }}
 												aria-hidden={!showCopyFeedback}
 											>
 												Copied
@@ -799,10 +814,8 @@ export function BookmarksSection({
 								</div>
 								<div
 									className={cn(
-										"relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right motion-safe:[transition-property:transform,opacity] motion-safe:duration-[220ms] motion-safe:ease-[var(--ease-out-quint)]",
-										showCopyFeedback
-											? "-translate-y-1 opacity-0"
-											: "translate-y-0 opacity-100",
+										"relative ml-3 flex min-h-[1.5rem] min-w-[8.5rem] justify-end text-right",
+										isEditing && "opacity-0",
 									)}
 								>
 									<time className="self-center text-xs text-muted-foreground tabular-nums transition-opacity motion-safe:duration-150 motion-safe:ease-[var(--ease-out-quart)] group-hover:opacity-0 group-focus-within:opacity-0">

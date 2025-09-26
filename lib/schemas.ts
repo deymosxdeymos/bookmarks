@@ -125,3 +125,42 @@ export function mapCategoryRow(
 		createdAt: row.created_at,
 	};
 }
+
+export const loginSchema = z.object({
+	email: z
+		.string()
+		.trim()
+		.min(1, "Enter your email address.")
+		.email("Enter a valid email address."),
+	password: z
+		.string()
+		.transform((val) => val.replace(/\s+$/, ""))
+		.pipe(z.string().min(1, "Enter your password.")),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
+
+export const signUpSchema = z
+	.object({
+		email: z
+			.string()
+			.trim()
+			.min(1, "Enter your email address.")
+			.email("Enter a valid email address."),
+		username: z
+			.string()
+			.trim()
+			.min(1, "Enter a username (3+ characters).")
+			.min(3, "Username must be at least 3 characters."),
+		password: z
+			.string()
+			.transform((val) => val.replace(/\s+$/, ""))
+			.pipe(z.string().min(8, "Password must be at least 8 characters.")),
+		confirmPassword: z.string().transform((val) => val.replace(/\s+$/, "")),
+	})
+	.refine((data) => data.password === data.confirmPassword, {
+		message: "Passwords do not match.",
+		path: ["confirmPassword"],
+	});
+
+export type SignUpInput = z.infer<typeof signUpSchema>;

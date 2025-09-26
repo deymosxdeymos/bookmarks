@@ -1,13 +1,16 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 import { Asterisk } from "@/components/ui/asterisk";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { type SignUpInput, signUpSchema } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
 export function SignUpForm({
@@ -24,20 +27,8 @@ export function SignUpForm({
 	const passwordErrorId = `${passwordId}-error`;
 	const confirmErrorId = `${confirmId}-error`;
 
-	const [email, setEmail] = useState("");
-	const [username, setUsername] = useState("");
-	const [password, setPassword] = useState("");
-	const [confirmPassword, setConfirmPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
 	const [showConfirm, setShowConfirm] = useState(false);
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState("");
-	const [fieldErrors, setFieldErrors] = useState<{
-		email?: string;
-		username?: string;
-		password?: string;
-		confirmPassword?: string;
-	}>({});
 
 	const emailRef = useRef<HTMLInputElement>(null);
 	const usernameRef = useRef<HTMLInputElement>(null);
@@ -47,96 +38,51 @@ export function SignUpForm({
 
 	const router = useRouter();
 
-	const isDirty =
-		email.length > 0 ||
-		username.length > 0 ||
-		password.length > 0 ||
-		confirmPassword.length > 0;
+	const {
+		register,
+		handleSubmit,
+		setError,
+		formState: { errors, isSubmitting, isDirty },
+	} = useForm<SignUpInput>({
+		resolver: zodResolver(signUpSchema),
+		defaultValues: {
+			email: "",
+			username: "",
+			password: "",
+			confirmPassword: "",
+		},
+	});
 
 	useEffect(() => {
 		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-			if (!isDirty || isLoading) return;
+			if (!isDirty || isSubmitting) return;
 			event.preventDefault();
 			event.returnValue = "";
 		};
 		window.addEventListener("beforeunload", handleBeforeUnload);
 		return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-	}, [isDirty, isLoading]);
+	}, [isDirty, isSubmitting]);
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		setError("");
-		if (isLoading) return;
-
-		const trimmedEmail = email.trim();
-		const trimmedUsername = username.trim();
-		const sanitizedPassword = password.replace(/\s+$/, "");
-		const sanitizedConfirm = confirmPassword.replace(/\s+$/, "");
-
-		const nextFieldErrors: {
-			email?: string;
-			username?: string;
-			password?: string;
-			confirmPassword?: string;
-		} = {};
-
-		if (!trimmedEmail) {
-			nextFieldErrors.email = "Enter your email address.";
-		} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-			nextFieldErrors.email = "Enter a valid email address.";
-		}
-
-		if (!trimmedUsername) {
-			nextFieldErrors.username = "Enter a username (3+ characters).";
-		} else if (trimmedUsername.length < 3) {
-			nextFieldErrors.username = "Username must be at least 3 characters.";
-		}
-
-		if (!sanitizedPassword) {
-			nextFieldErrors.password = "Enter your password.";
-		} else if (sanitizedPassword.length < 8) {
-			nextFieldErrors.password = "Password must be at least 8 characters.";
-		}
-
-		if (!sanitizedConfirm) {
-			nextFieldErrors.confirmPassword = "Confirm your password.";
-		} else if (sanitizedConfirm !== sanitizedPassword) {
-			nextFieldErrors.confirmPassword = "Passwords do not match.";
-		}
-
-		if (Object.keys(nextFieldErrors).length > 0) {
-			setFieldErrors(nextFieldErrors);
-			const [firstField] = Object.keys(nextFieldErrors);
-			requestAnimationFrame(() => {
-				if (firstField === "email") emailRef.current?.focus();
-				else if (firstField === "username") usernameRef.current?.focus();
-				else if (firstField === "password") passwordRef.current?.focus();
-				else if (firstField === "confirmPassword") confirmRef.current?.focus();
-			});
-			return;
-		}
-
-		setFieldErrors({});
-		setEmail(trimmedEmail);
-		setUsername(trimmedUsername);
-		setPassword(sanitizedPassword);
-		setConfirmPassword(sanitizedConfirm);
-		setIsLoading(true);
-
+	const onSubmit = async (data: SignUpInput) => {
 		try {
 			await authClient.signUp.email({
-				email: trimmedEmail,
-				password: sanitizedPassword,
-				name: trimmedUsername,
+				email: data.email,
+				password: data.password,
+				name: data.username,
 			});
 			router.push("/dashboard");
 		} catch (_err) {
-			setError("Unable to sign up with those details");
+			setError("root", {
+				message: "Unable to sign up with those details",
+			});
 			requestAnimationFrame(() => errorRef.current?.focus());
-		} finally {
-			setIsLoading(false);
 		}
 	};
+
+	const emailRegistration = register("email");
+	const usernameRegistration = register("username");
+	const passwordRegistration = register("password");
+	const confirmPasswordRegistration = register("confirmPassword");
 
 	return (
 		<div
@@ -156,8 +102,12 @@ export function SignUpForm({
 						<h1 className="font-semibold text-lg">Create your account</h1>
 						<Asterisk />
 					</div>
-					<form onSubmit={handleSubmit} className="space-y-6" noValidate>
-						{error && (
+					<form
+						onSubmit={handleSubmit(onSubmit)}
+						className="space-y-6"
+						noValidate
+					>
+						{errors.root && (
 							<div
 								ref={errorRef}
 								className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-center text-sm font-medium text-destructive"
@@ -165,71 +115,60 @@ export function SignUpForm({
 								aria-live="polite"
 								tabIndex={-1}
 							>
-								{error}
+								{errors.root.message}
 							</div>
 						)}
 
 						<div className="space-y-2">
 							<Input
-								ref={emailRef}
+								{...emailRegistration}
+								ref={(e) => {
+									emailRegistration.ref(e);
+									emailRef.current = e;
+								}}
 								id={emailId}
 								type="email"
 								placeholder="Enter your email…"
-								value={email}
-								onChange={(event) => {
-									setEmail(event.target.value);
-									if (fieldErrors.email)
-										setFieldErrors((prev) => ({ ...prev, email: undefined }));
-								}}
 								autoComplete="email"
-								name="email"
 								spellCheck={false}
-								aria-invalid={Boolean(fieldErrors.email)}
-								aria-describedby={fieldErrors.email ? emailErrorId : undefined}
+								aria-invalid={Boolean(errors.email)}
+								aria-describedby={errors.email ? emailErrorId : undefined}
 								className="w-full bg-muted text-base"
 							/>
-							{fieldErrors.email && (
+							{errors.email && (
 								<p
 									id={emailErrorId}
 									className="text-sm font-medium text-destructive"
 									aria-live="polite"
 								>
-									{fieldErrors.email}
+									{errors.email.message}
 								</p>
 							)}
 						</div>
 
 						<div className="space-y-2">
 							<Input
-								ref={usernameRef}
+								{...usernameRegistration}
+								ref={(e) => {
+									usernameRegistration.ref(e);
+									usernameRef.current = e;
+								}}
 								id={usernameId}
 								type="text"
 								placeholder="Choose a username…"
-								value={username}
-								onChange={(event) => {
-									setUsername(event.target.value);
-									if (fieldErrors.username)
-										setFieldErrors((prev) => ({
-											...prev,
-											username: undefined,
-										}));
-								}}
 								autoComplete="username"
-								name="username"
 								spellCheck={false}
-								aria-invalid={Boolean(fieldErrors.username)}
-								aria-describedby={
-									fieldErrors.username ? usernameErrorId : undefined
-								}
+								aria-invalid={Boolean(errors.username)}
+								aria-describedby={errors.username ? usernameErrorId : undefined}
 								className="w-full bg-muted text-base"
 							/>
-							{fieldErrors.username && (
+							{errors.username && (
 								<p
 									id={usernameErrorId}
 									className="text-sm font-medium text-destructive"
 									aria-live="polite"
 								>
-									{fieldErrors.username}
+									{errors.username.message}
 								</p>
 							)}
 						</div>
@@ -237,24 +176,18 @@ export function SignUpForm({
 						<div className="space-y-2">
 							<div className="relative">
 								<Input
-									ref={passwordRef}
+									{...passwordRegistration}
+									ref={(e) => {
+										passwordRegistration.ref(e);
+										passwordRef.current = e;
+									}}
 									id={passwordId}
 									type={showPassword ? "text" : "password"}
 									placeholder="Create a password…"
-									value={password}
-									onChange={(event) => {
-										setPassword(event.target.value);
-										if (fieldErrors.password)
-											setFieldErrors((prev) => ({
-												...prev,
-												password: undefined,
-											}));
-									}}
 									autoComplete="new-password"
-									name="password"
-									aria-invalid={Boolean(fieldErrors.password)}
+									aria-invalid={Boolean(errors.password)}
 									aria-describedby={
-										fieldErrors.password ? passwordErrorId : undefined
+										errors.password ? passwordErrorId : undefined
 									}
 									className="w-full bg-muted pr-10 text-base"
 								/>
@@ -272,13 +205,13 @@ export function SignUpForm({
 									)}
 								</button>
 							</div>
-							{fieldErrors.password && (
+							{errors.password && (
 								<p
 									id={passwordErrorId}
 									className="text-sm font-medium text-destructive"
 									aria-live="polite"
 								>
-									{fieldErrors.password}
+									{errors.password.message}
 								</p>
 							)}
 						</div>
@@ -286,24 +219,18 @@ export function SignUpForm({
 						<div className="space-y-2">
 							<div className="relative">
 								<Input
-									ref={confirmRef}
+									{...confirmPasswordRegistration}
+									ref={(e) => {
+										confirmPasswordRegistration.ref(e);
+										confirmRef.current = e;
+									}}
 									id={confirmId}
 									type={showConfirm ? "text" : "password"}
 									placeholder="Confirm password…"
-									value={confirmPassword}
-									onChange={(event) => {
-										setConfirmPassword(event.target.value);
-										if (fieldErrors.confirmPassword)
-											setFieldErrors((prev) => ({
-												...prev,
-												confirmPassword: undefined,
-											}));
-									}}
 									autoComplete="new-password"
-									name="confirmPassword"
-									aria-invalid={Boolean(fieldErrors.confirmPassword)}
+									aria-invalid={Boolean(errors.confirmPassword)}
 									aria-describedby={
-										fieldErrors.confirmPassword ? confirmErrorId : undefined
+										errors.confirmPassword ? confirmErrorId : undefined
 									}
 									className="w-full bg-muted pr-10 text-base"
 								/>
@@ -325,13 +252,13 @@ export function SignUpForm({
 									)}
 								</button>
 							</div>
-							{fieldErrors.confirmPassword && (
+							{errors.confirmPassword && (
 								<p
 									id={confirmErrorId}
 									className="text-sm font-medium text-destructive"
 									aria-live="polite"
 								>
-									{fieldErrors.confirmPassword}
+									{errors.confirmPassword.message}
 								</p>
 							)}
 						</div>
@@ -346,10 +273,10 @@ export function SignUpForm({
 							<Button
 								size="sm"
 								type="submit"
-								disabled={isLoading}
+								disabled={isSubmitting}
 								className="px-4 py-3 text-sm font-bold"
 							>
-								{isLoading && (
+								{isSubmitting && (
 									<Loader2
 										className="mr-2 h-4 w-4 animate-spin"
 										aria-hidden="true"

@@ -277,6 +277,16 @@ export function CategoryCombobox({
 										applySelection(nextId);
 										setOpen(false);
 									}}
+									onKeyDown={(event) => {
+										if (event.key === "Enter" || event.key === " ") {
+											event.preventDefault();
+											event.stopPropagation();
+											const value = categoryOption.id ?? "all";
+											const nextId = value === "all" ? null : value;
+											applySelection(nextId);
+											setOpen(false);
+										}
+									}}
 									className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors aria-selected:bg-accent aria-selected:text-foreground focus:bg-accent focus:outline-none"
 								>
 									<ColorSwatch
