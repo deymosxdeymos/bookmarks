@@ -22,10 +22,10 @@ function isBlockedHostname(hostname: string) {
 }
 
 function isAllowedUrl(u: URL) {
-	if (u.protocol !== "https:") return false; // enforce TLS
+	if (u.protocol !== "https:" && u.protocol !== "http:") return false;
 	if (isBlockedHostname(u.hostname)) return false;
-	// Only allow default or explicit 443
-	if (u.port && u.port !== "443") return false;
+	// Allow default ports for both HTTP (80) and HTTPS (443)
+	if (u.port && u.port !== "443" && u.port !== "80") return false;
 	return true;
 }
 
